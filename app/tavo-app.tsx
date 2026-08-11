@@ -539,7 +539,9 @@ function Restaurant() {
   const [inside, setInside] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [orderNo, setOrderNo] = useState(0);
+  const [reviewOpen, setReviewOpen] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  const [submittedOrder, setSubmittedOrder] = useState<CartItem[]>([]);
   const total = useMemo(
     () => cart.reduce((sum, x) => sum + x.price * x.qty, 0),
     [cart],
@@ -551,10 +553,23 @@ function Restaurant() {
         ? prev.map((x) => (x.name === item.name ? { ...x, qty: x.qty + 1 } : x))
         : [...prev, { name: item.name, price: item.price, qty: 1 }];
     });
+  const decrease = (name: string) =>
+    setCart((prev) =>
+      prev
+        .map((item) =>
+          item.name === name ? { ...item, qty: item.qty - 1 } : item,
+        )
+        .filter((item) => item.qty > 0),
+    );
+  const quantityFor = (name: string) =>
+    cart.find((item) => item.name === name)?.qty ?? 0;
+  const itemCount = cart.reduce((sum, item) => sum + item.qty, 0);
   const submit = () => {
     if (!cart.length) return;
+    setSubmittedOrder(cart);
     setOrderNo((x) => x + 1);
     setCart([]);
+    setReviewOpen(false);
     setConfirmed(true);
   };
   return (
@@ -570,7 +585,11 @@ function Restaurant() {
         <small>DEV · PRÉSENCE</small>
         <button
           className={!inside ? "active" : ""}
-          onClick={() => setInside(false)}
+          onClick={() => {
+            setInside(false);
+            setReviewOpen(false);
+            setCart([]);
+          }}
         >
           À L’EXTÉRIEUR
         </button>
@@ -645,30 +664,90 @@ function Restaurant() {
                 <span>{item.price} MAD</span>
               </div>
               {inside && (
-                <button
-                  onClick={() => add(item)}
-                  aria-label={`Ajouter ${item.name}`}
-                >
-                  ＋
-                </button>
+                <div className="menu-control">
+                  {quantityFor(item.name) === 0 ? (
+                    <button
+                      className="add-item"
+                      onClick={() => add(item)}
+                      aria-label={`Ajouter ${item.name}`}
+                    >
+                      Ajouter
+                    </button>
+                  ) : (
+                    <div className="quantity-stepper" aria-label={`Quantité pour ${item.name}`}>
+                      <button
+                        onClick={() => decrease(item.name)}
+                        aria-label={`Retirer un ${item.name}`}
+                      >
+                        −
+                      </button>
+                      <strong>{quantityFor(item.name)}</strong>
+                      <button
+                        onClick={() => add(item)}
+                        aria-label={`Ajouter un ${item.name}`}
+                      >
+                        +
+                      </button>
+                    </div>
+                  )}
+                </div>
               )}
             </article>
           ))}
         </div>
       </section>
-      {inside && (
-        <aside className={`cart-bar ${cart.length ? "cart-open" : ""}`}>
+      {inside && cart.length > 0 && (
+        <aside className="cart-bar cart-open">
           <div>
-            <small>VOTRE COMMANDE</small>
+            <small>MA COMMANDE</small>
             <strong>
-              {cart.reduce((s, x) => s + x.qty, 0)} article
-              {cart.reduce((s, x) => s + x.qty, 0) > 1 ? "s" : ""} · {total} MAD
+              {itemCount} article{itemCount > 1 ? "s" : ""} · {total} MAD
             </strong>
           </div>
-          <button onClick={submit} disabled={!cart.length}>
-            Commander <span>→</span>
+          <button onClick={() => setReviewOpen(true)}>
+            Voir la commande <span>→</span>
           </button>
         </aside>
+      )}
+      {inside && reviewOpen && (
+        <div className="confirmation order-review" role="dialog" aria-modal="true" aria-labelledby="review-title">
+          <section className="review-sheet">
+            <header>
+              <div>
+                <p className="eyebrow">Atelier Noya · Sur place</p>
+                <h2 id="review-title">Ma commande.</h2>
+              </div>
+              <button className="modal-close" onClick={() => setReviewOpen(false)} aria-label="Fermer">
+                ×
+              </button>
+            </header>
+            <div className="review-items">
+              {cart.map((item, index) => (
+                <article className="review-item" key={item.name}>
+                  <span className="review-index">0{index + 1}</span>
+                  <div>
+                    <h3>{item.name}</h3>
+                    <p>{item.price} MAD l’unité</p>
+                  </div>
+                  <div className="quantity-stepper review-stepper">
+                    <button onClick={() => decrease(item.name)} aria-label={`Retirer un ${item.name}`}>−</button>
+                    <strong>{item.qty}</strong>
+                    <button onClick={() => add(menu.find((dish) => dish.name === item.name)!)} aria-label={`Ajouter un ${item.name}`}>+</button>
+                  </div>
+                  <strong>{item.price * item.qty} MAD</strong>
+                </article>
+              ))}
+            </div>
+            <div className="review-total">
+              <span><small>SOUS-TOTAL</small><b>{total} MAD</b></span>
+              <span><small>TOTAL</small><b>{total} MAD</b></span>
+            </div>
+            <button className="review-submit" onClick={submit} disabled={!cart.length}>
+              <span>Commander</span><strong>{itemCount} article{itemCount > 1 ? "s" : ""} · {total} MAD</strong><i>→</i>
+            </button>
+            <p className="review-note">La commande devient définitive après envoi. Toute consommation supplémentaire créera une nouvelle commande.</p>
+          </section>
+        </div>
       )}
       {confirmed && (
         <div className="confirmation" role="dialog" aria-modal="true">
@@ -684,8 +763,14 @@ function Restaurant() {
               <em>G001-{String(orderNo).padStart(2, "0")}</em>
             </h2>
             <p>
-              Votre commande est en attente de validation par le restaurant.
+              Votre commande complète de {submittedOrder.reduce((sum, item) => sum + item.qty, 0)} article
+              {submittedOrder.reduce((sum, item) => sum + item.qty, 0) > 1 ? "s" : ""} a été transmise au restaurant.
             </p>
+            <div className="submitted-summary">
+              {submittedOrder.map((item) => (
+                <span key={item.name}><b>{item.qty} ×</b> {item.name}<strong>{item.qty * item.price} MAD</strong></span>
+              ))}
+            </div>
             <div className="order-status">
               <span />
               <b>COMMANDE REÇUE</b>
