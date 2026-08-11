@@ -1,0 +1,16 @@
+export function distanceMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const radius = 6_371_000;
+  const toRad = (value: number) => (value * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return radius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+export function presenceDecision(input: { distance: number; accuracy: number; radius: number }) {
+  if (!Number.isFinite(input.accuracy) || input.accuracy <= 0 || input.accuracy > Math.max(25, input.radius * 2)) {
+    return { allowed: false, reason: "INACCURATE" as const };
+  }
+  if (input.distance > input.radius) return { allowed: false, reason: "OUTSIDE" as const };
+  return { allowed: true, reason: "INSIDE" as const };
+}

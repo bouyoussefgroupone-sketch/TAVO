@@ -1,2 +1,4 @@
 import { TavoApp } from "../tavo-app";
-export default function Page(){ return <TavoApp screen="manager"/>; }
+import { requireRole } from "@/lib/auth";
+export const dynamic = "force-dynamic";
+export default async function Page(){ await requireRole(["MANAGER"]); return <TavoApp screen="manager"/>; }
