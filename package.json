@@ -1,5 +1,5 @@
 {
-  "name": "tavo-local-prototype",
+  "name": "tavo",
   "version": "0.1.0",
   "private": true,
   "engines": {
@@ -8,27 +8,32 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "vercel-build": "npm run db:migrate && next build",
     "start": "next start",
     "lint": "eslint . --ignore-pattern .next",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
+    "db:seed:production": "tsx scripts/seed.ts",
     "db:reset": "tsx scripts/reset-db.ts",
     "test": "tsx --test tests/*.test.ts"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
+    "@vercel/blob": "^2.8.0",
     "bcryptjs": "^3.0.3",
     "jose": "^6.2.8",
-    "next": "16.2.6",
+    "next": "^16.3.0",
+    "pg": "^8.23.0",
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@eslint/js": "9.39.4",
-    "@next/eslint-plugin-next": "16.2.6",
+    "@next/eslint-plugin-next": "^16.3.0",
     "@tailwindcss/postcss": "4.2.1",
     "@types/node": "22.19.19",
+    "@types/pg": "^8.21.0",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "eslint": "9.39.4",
@@ -36,7 +41,7 @@
     "eslint-plugin-react": "7.37.5",
     "eslint-plugin-react-hooks": "7.1.1",
     "globals": "16.4.0",
-    "sharp": "0.34.5",
+    "sharp": "^0.35.3",
     "tailwindcss": "4.2.1",
     "tsx": "^4.20.6",
     "typescript": "5.9.3",

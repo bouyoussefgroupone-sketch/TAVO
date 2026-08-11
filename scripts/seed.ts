@@ -1,16 +1,20 @@
-import { PGlite } from "@electric-sql/pglite";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "node:crypto";
-import fs from "node:fs/promises";
-import path from "node:path";
 import { loadLocalEnv } from "./env";
+import { closeDb, executeScript, rows } from "../lib/db";
 
 loadLocalEnv();
-const databasePath = process.env.DATABASE_PATH || ".data/tavo-pg";
-await fs.mkdir(path.dirname(databasePath), { recursive: true });
-const db = new PGlite(databasePath);
+const productionTarget = Boolean(process.env.DATABASE_URL);
+if (productionTarget && process.env.TAVO_ALLOW_PRODUCTION_SEED !== "true") {
+  throw new Error("Production seed refused. Set TAVO_ALLOW_PRODUCTION_SEED=true for one-time initialization.");
+}
+const db = { query: async <T extends Record<string, unknown> = Record<string, unknown>>(sql:string, values:unknown[] = []) => ({ rows: await rows<T>(sql, values) }) };
+if (productionTarget) {
+  const [state] = await rows<{ has_data:boolean }>("SELECT EXISTS(SELECT 1 FROM restaurants) AS has_data");
+  if (state?.has_data) throw new Error("Production seed refused because the database is not empty.");
+}
 
-await db.exec(`TRUNCATE audit_log, media_assets, billing_statements, support_tickets, proposals,
+await executeScript(`TRUNCATE audit_log, media_assets, billing_statements, support_tickets, proposals,
   order_items, orders, visit_sessions, presence_authorizations, professional_sessions,
   crown_offers, crown_experiences, collection_dishes, restaurant_offers, dish_labels,
   dishes, labels, collections, categories, user_restaurants, users, restaurants, sectors,
@@ -113,19 +117,27 @@ for (const [index, [name, slug, description]] of crownData.entries()) {
   await db.query("INSERT INTO crown_offers(experience_id,restaurant_id,price_cents,availability_note,status) VALUES($1,$2,$3,$4,'PUBLISHED')", [experienceId, restaurantIds[restaurants[index % restaurants.length][1]], 68000 + index * 10000, "Sur réservation auprès du restaurant"]);
 }
 
-const adminHash = await bcrypt.hash(process.env.TAVO_ADMIN_PASSWORD || "TavoAdmin!2026", 12);
-const managerHash = await bcrypt.hash(process.env.TAVO_MANAGER_PASSWORD || "TavoManager!2026", 12);
-const partnerHash = await bcrypt.hash(process.env.TAVO_PARTNER_PASSWORD || "TavoPartner!2026", 12);
-const adminId = await insertId("INSERT INTO users(email,name,password_hash,role,status) VALUES($1,'Salma Benali',$2,'ADMIN','ACTIVE') RETURNING id", [process.env.TAVO_ADMIN_EMAIL || "admin@tavo.local", adminHash]);
-const managerId = await insertId("INSERT INTO users(email,name,password_hash,role,city_id,sector_id,status) VALUES($1,'Yassine Mansour',$2,'MANAGER',$3,$4,'ACTIVE') RETURNING id", [process.env.TAVO_MANAGER_EMAIL || "manager.rabat@tavo.local", managerHash, rabatId, sectorIds.Agdal]);
-const partnerId = await insertId("INSERT INTO users(email,name,password_hash,role,status) VALUES($1,'Équipe Noya',$2,'PARTNER','ACTIVE') RETURNING id", [process.env.TAVO_PARTNER_EMAIL || "partner.noya@tavo.local", partnerHash]);
-await db.query("INSERT INTO user_restaurants(user_id,restaurant_id) VALUES($1,$2)", [partnerId, restaurantIds["atelier-noya"]]);
 await db.query("INSERT INTO settings(key,value) VALUES('default_commission_bps',$1),('visit_lifetime_minutes',$2),('presence_lifetime_minutes',$3)", [JSON.stringify(1200), JSON.stringify(180), JSON.stringify(10)]);
 
-await db.query(`INSERT INTO proposals(restaurant_id,submitted_by,type,payload,status)
-  VALUES($1,$2,'PRICE_UPDATE',$3,'PENDING'),($1,$2,'CROWN',$4,'PENDING')`, [restaurantIds["atelier-noya"], partnerId, JSON.stringify({ offerId: 1, proposedPriceCents: 7200 }), JSON.stringify({ name: "Dîner au patio", description: "Expérience privée proposée par Atelier Noya" })]);
-await db.query("INSERT INTO support_tickets(restaurant_id,created_by,subject,category,message,status) VALUES($1,$2,$3,$4,$5,'OPEN')", [restaurantIds["atelier-noya"], partnerId, "Mise à jour des horaires", "INFORMATIONS", "Pouvez-vous vérifier les horaires du dimanche ?"]);
-await db.query("INSERT INTO audit_log(actor_user_id,action,entity_type,entity_id,details) VALUES($1,'SEED','SYSTEM',$2,$3)", [adminId, randomUUID(), JSON.stringify({ demo: true, managerId, partnerId })]);
-
-console.log("TAVO demo data seeded.");
-await db.close();
+if (productionTarget) {
+  const email = process.env.TAVO_BOOTSTRAP_ADMIN_EMAIL;
+  const password = process.env.TAVO_BOOTSTRAP_ADMIN_PASSWORD;
+  if (!email || !password || password.length < 14) throw new Error("Production admin email and password (14+ characters) are required.");
+  const adminId = await insertId("INSERT INTO users(email,name,password_hash,role,status) VALUES($1,'Administrateur TAVO',$2,'ADMIN','ACTIVE') RETURNING id", [email.toLowerCase(), await bcrypt.hash(password, 12)]);
+  await db.query("INSERT INTO audit_log(actor_user_id,action,entity_type,entity_id,details) VALUES($1,'PRODUCTION_BOOTSTRAP','SYSTEM',$2,$3)", [adminId, randomUUID(), JSON.stringify({ demo: false })]);
+  console.log("TAVO production catalogue and first admin initialized.");
+} else {
+  const adminHash = await bcrypt.hash(process.env.TAVO_ADMIN_PASSWORD || "TavoAdmin!2026", 12);
+  const managerHash = await bcrypt.hash(process.env.TAVO_MANAGER_PASSWORD || "TavoManager!2026", 12);
+  const partnerHash = await bcrypt.hash(process.env.TAVO_PARTNER_PASSWORD || "TavoPartner!2026", 12);
+  const adminId = await insertId("INSERT INTO users(email,name,password_hash,role,status) VALUES($1,'Salma Benali',$2,'ADMIN','ACTIVE') RETURNING id", [process.env.TAVO_ADMIN_EMAIL || "admin@tavo.local", adminHash]);
+  const managerId = await insertId("INSERT INTO users(email,name,password_hash,role,city_id,sector_id,status) VALUES($1,'Yassine Mansour',$2,'MANAGER',$3,$4,'ACTIVE') RETURNING id", [process.env.TAVO_MANAGER_EMAIL || "manager.rabat@tavo.local", managerHash, rabatId, sectorIds.Agdal]);
+  const partnerId = await insertId("INSERT INTO users(email,name,password_hash,role,status) VALUES($1,'Équipe Noya',$2,'PARTNER','ACTIVE') RETURNING id", [process.env.TAVO_PARTNER_EMAIL || "partner.noya@tavo.local", partnerHash]);
+  await db.query("INSERT INTO user_restaurants(user_id,restaurant_id) VALUES($1,$2)", [partnerId, restaurantIds["atelier-noya"]]);
+  await db.query(`INSERT INTO proposals(restaurant_id,submitted_by,type,payload,status)
+    VALUES($1,$2,'PRICE_UPDATE',$3,'PENDING'),($1,$2,'CROWN',$4,'PENDING')`, [restaurantIds["atelier-noya"], partnerId, JSON.stringify({ offerId: 1, proposedPriceCents: 7200 }), JSON.stringify({ name: "Dîner au patio", description: "Expérience privée proposée par Atelier Noya" })]);
+  await db.query("INSERT INTO support_tickets(restaurant_id,created_by,subject,category,message,status) VALUES($1,$2,$3,$4,$5,'OPEN')", [restaurantIds["atelier-noya"], partnerId, "Mise à jour des horaires", "INFORMATIONS", "Pouvez-vous vérifier les horaires du dimanche ?"]);
+  await db.query("INSERT INTO audit_log(actor_user_id,action,entity_type,entity_id,details) VALUES($1,'SEED','SYSTEM',$2,$3)", [adminId, randomUUID(), JSON.stringify({ demo: true, managerId, partnerId })]);
+  console.log("TAVO local demo data seeded.");
+}
+await closeDb();

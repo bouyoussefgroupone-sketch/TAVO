@@ -1,8 +1,8 @@
-# TAVO — V1 locale
+# TAVO
 
-TAVO est un catalogue visuel mobile-first de plats et d’expériences culinaires. Le client découvre d’abord un plat, choisit un restaurant partenaire, consulte son menu TAVO, puis peut commander uniquement après validation de sa présence physique. Aucun compte client ni paiement en ligne n’est utilisé.
+TAVO est un catalogue visuel mobile-first de plats et d’expériences culinaires. Le client découvre un plat, choisit un restaurant, consulte son menu TAVO et peut commander uniquement après validation serveur de sa présence physique. Aucun compte client ni paiement en ligne n’est utilisé.
 
-## Installation et lancement
+## Développement local
 
 Prérequis : Node.js 22 ou plus récent.
 
@@ -14,47 +14,56 @@ npm run db:seed
 npm run dev
 ```
 
-Ouvrir [http://localhost:3000](http://localhost:3000). L’entrée Wallet simulée est disponible sur [http://localhost:3000/wallet](http://localhost:3000/wallet).
+Application : [http://localhost:3000](http://localhost:3000)
 
-Pour recréer intégralement la base locale :
+Wallet simulé : [http://localhost:3000/wallet](http://localhost:3000/wallet)
+
+Connexion professionnelle : [http://localhost:3000/login](http://localhost:3000/login)
+
+Sans `DATABASE_URL`, TAVO utilise PGlite dans `DATABASE_PATH`. Sans `BLOB_READ_WRITE_TOKEN`, les médias sont stockés sous `MEDIA_ROOT`. Ces données locales et `.env.local` sont ignorées par Git.
+
+Comptes de démonstration locaux :
+
+| Rôle | Email | Mot de passe |
+|---|---|---|
+| Admin | `admin@tavo.local` | `TavoAdmin!2026` |
+| Manager | `manager.rabat@tavo.local` | `TavoManager!2026` |
+| Partner | `partner.noya@tavo.local` | `TavoPartner!2026` |
+
+Ces identifiants ne sont jamais créés lorsque `DATABASE_URL` cible PostgreSQL.
+
+## Base de données et initialisation
 
 ```bash
-npm run db:reset
 npm run db:migrate
 npm run db:seed
+npm test
 ```
 
-## Comptes de développement
+Le schéma SQL de `migrations/` fonctionne avec PGlite local et PostgreSQL managé. En production, `DATABASE_URL` sélectionne le pool PostgreSQL. `vercel-build` applique uniquement les migrations manquantes avant le build.
 
-| Rôle | Email | Mot de passe | Périmètre |
-|---|---|---|---|
-| Admin | `admin@tavo.local` | `TavoAdmin!2026` | Global |
-| Manager | `manager.rabat@tavo.local` | `TavoManager!2026` | Rabat · Agdal |
-| Partner | `partner.noya@tavo.local` | `TavoPartner!2026` | Atelier Noya |
+L’initialisation d’une base de production vide exige temporairement `TAVO_ALLOW_PRODUCTION_SEED=true`, `TAVO_BOOTSTRAP_ADMIN_EMAIL` et `TAVO_BOOTSTRAP_ADMIN_PASSWORD`. Elle refuse une base non vide, ne crée aucun Manager/Partner de démonstration et ne doit être exécutée qu’une fois. Les deux variables de bootstrap doivent ensuite être retirées.
 
-Connexion : [http://localhost:3000/login](http://localhost:3000/login). Les routes `/admin`, `/manager` et `/partner` sont aussi protégées côté serveur.
+## Architecture Vercel
 
-## Parcours et architecture
+- Vercel héberge l’application Next.js et fournit les déploiements Preview/Production.
+- Neon, provisionné via Vercel Marketplace, fournit PostgreSQL managé.
+- Vercel Blob conserve les images publiques de catalogue via l’adaptateur `MediaStorage`.
+- Les sessions professionnelles et autorisations de présence restent opaques, expirantes, `httpOnly` et contrôlées côté serveur.
+- Aucune position client brute, trajectoire ou identité client n’est persistée.
 
-- `/`, `/search`, `/dish/[slug]`, `/restaurant/[slug]`, `/collection/[slug]` : catalogue dynamique issu de PostgreSQL local.
-- `/crown` et `/crown/[slug]` : univers Crown curaté et offres par restaurant.
-- `/wallet` : entrée/deep-link locale. `lib/wallet.ts` définit la frontière d’intégration des futurs passes signés.
-- `/api/presence/check` : contrôle ponctuel distance/rayon/précision et émission d’une autorisation opaque, courte et limitée au restaurant.
-- `/api/orders` : panier complet, visite anonyme temporaire, références `G001-01`, `G001-02`, instantanés de lignes immuables et retour de validation.
-- `/api/professional` : opérations Admin, Manager et Partner avec contrôle de rôle et de périmètre côté serveur.
-- `/api/media` : stockage local derrière un adaptateur remplaçable.
+Variables persistantes Vercel nécessaires : `DATABASE_URL`, `BLOB_READ_WRITE_TOKEN`. `DATABASE_POOL_MAX` est optionnelle. `NEXT_PUBLIC_ENABLE_GEO_SIMULATOR` doit rester absente ou à `false` dans Preview et Production.
 
-La base locale utilise PGlite et les migrations SQL de `migrations/`. Le schéma reste PostgreSQL standard pour permettre le passage à une base managée. Les mots de passe sont hachés avec bcrypt, les sessions professionnelles sont opaques et stockées dans des cookies `httpOnly`.
+## Git et déploiements
 
-## Règles de confidentialité
+GitHub est la source de vérité :
 
-- Aucun compte, profil, PII ou fingerprint client.
-- La navigation seule ne crée aucune visite.
-- Aucune position ou trajectoire client n’est conservée ; seules les coordonnées fixes des restaurants existent dans le schéma.
-- Une visite anonyme, limitée au restaurant et expirante, n’est créée qu’au premier ordre.
-- Chaque soumission crée une nouvelle commande immuable ; seuls ses statuts opérationnels peuvent évoluer avec audit.
+```text
+branche non-main → push GitHub → Vercel Preview
+main             → push GitHub → Vercel Production
+```
 
-Le contrôle `DEV · PRÉSENCE` est activé uniquement par `NEXT_PUBLIC_ENABLE_GEO_SIMULATOR=true`. Il doit être désactivé en production. Même en simulation, le serveur émet l’autorisation exigée par la soumission.
+Les changements applicatifs doivent être commités et poussés depuis Git ; aucune modification de source ne doit être faite uniquement dans Vercel. Le domaine Vercel HTTPS est utilisé jusqu’à la configuration ultérieure du domaine final.
 
 ## Vérification
 
@@ -62,10 +71,11 @@ Le contrôle `DEV · PRÉSENCE` est activé uniquement par `NEXT_PUBLIC_ENABLE_G
 npm test
 npm run lint
 npm run build
+npm audit --omit=dev
 ```
 
-Les tests couvrent notamment la géolocalisation, l’expiration et la portée des autorisations, les rôles, le périmètre Manager, la relation plat/restaurants, la limite de deux plats mis en avant, l’archivage sûr, les séquences de visite/commande, l’immutabilité, les propositions, la facturation et les invariants de confidentialité.
+Les tests couvrent notamment rôles/périmètres, géolocalisation, autorisations expirantes, limite de deux plats mis en avant, relations plat/restaurants, archivage sûr, visites anonymes, séquences `G001-01`/`G001-02`, immutabilité, propositions, facturation et confidentialité.
 
-## Passage futur en production
+## Wallet
 
-Il restera à fournir : un dépôt GitHub privé, un projet Vercel et ses variables d’environnement, une URL PostgreSQL managée compatible avec les migrations, un adaptateur de stockage objet et ses clés, puis les comptes/certificats Apple Developer et Google Wallet nécessaires à la signature réelle des passes. Aucun pass Wallet signé n’est prétendu dans cette V1 locale.
+`/wallet` et la frontière d’intégration sont prêts. Les passes réellement signés nécessiteront ultérieurement les comptes, certificats et validations Apple Developer et Google Wallet ; ils ne font pas partie de ce déploiement.

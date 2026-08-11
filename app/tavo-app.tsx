@@ -2,6 +2,7 @@
 /* eslint-disable @next/next/no-html-link-for-pages, @next/next/no-img-element, @typescript-eslint/no-unused-vars */
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { TavoData } from "@/lib/catalog";
 
 type Screen =
@@ -931,21 +932,22 @@ const professionalData = {
 };
 
 function Professional({ role }: { role: "partner" | "manager" | "admin" }) {
+  const router = useRouter();
   const d = professionalData[role];
   const [active, setActive] = useState(d.nav[0]);
   const [snapshot, setSnapshot] = useState<ProfessionalSnapshot | null>(null);
   const [notice, setNotice] = useState("");
   async function refreshProfessional() {
     const response = await fetch("/api/professional", { cache: "no-store" });
-    if (response.status === 401) { window.location.href = "/login"; return; }
+    if (response.status === 401) { router.replace("/login"); return; }
     if (response.ok) setSnapshot(await response.json());
   }
   useEffect(() => {
     void fetch("/api/professional", { cache: "no-store" }).then(async (response) => {
-      if (response.status === 401) { window.location.href = "/login"; return; }
+      if (response.status === 401) { router.replace("/login"); return; }
       if (response.ok) setSnapshot(await response.json());
     });
-  }, []);
+  }, [router]);
   async function runAction(action: string, payload: Record<string, unknown>) {
     setNotice("");
     const response = await fetch("/api/professional", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action, payload }) });
@@ -953,7 +955,7 @@ function Professional({ role }: { role: "partner" | "manager" | "admin" }) {
     setNotice(response.ok ? "Modification enregistrée." : result.error || "Action impossible.");
     if (response.ok) await refreshProfessional();
   }
-  async function logout() { await fetch("/api/auth/logout", { method: "POST" }); window.location.href = "/login"; }
+  async function logout() { await fetch("/api/auth/logout", { method: "POST" }); router.replace("/login"); }
   return (
     <main className="pro-page">
       <aside className="pro-sidebar">
