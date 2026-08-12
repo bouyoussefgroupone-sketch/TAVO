@@ -8,6 +8,11 @@ const productionTarget = Boolean(process.env.DATABASE_URL);
 if (productionTarget && process.env.TAVO_ALLOW_PRODUCTION_SEED !== "true") {
   throw new Error("Production seed refused. Set TAVO_ALLOW_PRODUCTION_SEED=true for one-time initialization.");
 }
+const productionAdminEmail = productionTarget ? process.env.TAVO_BOOTSTRAP_ADMIN_EMAIL : undefined;
+const productionAdminPassword = productionTarget ? process.env.TAVO_BOOTSTRAP_ADMIN_PASSWORD : undefined;
+if (productionTarget && (!productionAdminEmail || !productionAdminPassword || productionAdminPassword.length < 14)) {
+  throw new Error("Production admin email and password (14+ characters) are required.");
+}
 const db = { query: async <T extends Record<string, unknown> = Record<string, unknown>>(sql:string, values:unknown[] = []) => ({ rows: await rows<T>(sql, values) }) };
 if (productionTarget) {
   const [state] = await rows<{ has_data:boolean }>("SELECT EXISTS(SELECT 1 FROM restaurants) AS has_data");
@@ -120,10 +125,7 @@ for (const [index, [name, slug, description]] of crownData.entries()) {
 await db.query("INSERT INTO settings(key,value) VALUES('default_commission_bps',$1),('visit_lifetime_minutes',$2),('presence_lifetime_minutes',$3)", [JSON.stringify(1200), JSON.stringify(180), JSON.stringify(10)]);
 
 if (productionTarget) {
-  const email = process.env.TAVO_BOOTSTRAP_ADMIN_EMAIL;
-  const password = process.env.TAVO_BOOTSTRAP_ADMIN_PASSWORD;
-  if (!email || !password || password.length < 14) throw new Error("Production admin email and password (14+ characters) are required.");
-  const adminId = await insertId("INSERT INTO users(email,name,password_hash,role,status) VALUES($1,'Administrateur TAVO',$2,'ADMIN','ACTIVE') RETURNING id", [email.toLowerCase(), await bcrypt.hash(password, 12)]);
+  const adminId = await insertId("INSERT INTO users(email,name,password_hash,role,status) VALUES($1,'Administrateur TAVO',$2,'ADMIN','ACTIVE') RETURNING id", [productionAdminEmail!.toLowerCase(), await bcrypt.hash(productionAdminPassword!, 12)]);
   await db.query("INSERT INTO audit_log(actor_user_id,action,entity_type,entity_id,details) VALUES($1,'PRODUCTION_BOOTSTRAP','SYSTEM',$2,$3)", [adminId, randomUUID(), JSON.stringify({ demo: false })]);
   console.log("TAVO production catalogue and first admin initialized.");
 } else {
