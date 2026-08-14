@@ -16,7 +16,7 @@ npm run dev
 
 Application : [http://localhost:3000](http://localhost:3000)
 
-Wallet simulé : [http://localhost:3000/wallet](http://localhost:3000/wallet)
+Pass TAVO et ajout Google Wallet (mode test) : [http://localhost:3000/wallet](http://localhost:3000/wallet)
 
 Connexion professionnelle : [http://localhost:3000/login](http://localhost:3000/login)
 
@@ -78,4 +78,4 @@ Les tests couvrent notamment rôles/périmètres, géolocalisation, autorisation
 
 ## Wallet
 
-`/wallet` et la frontière d’intégration sont prêts. Les passes réellement signés nécessiteront ultérieurement les comptes, certificats et validations Apple Developer et Google Wallet ; ils ne font pas partie de ce déploiement.
+`/wallet` génère côté serveur un lien Google Wallet signé pour le pass générique TAVO de test. Le compte de service Google Wallet doit être configuré uniquement dans les variables d’environnement du serveur ; aucune clé privée n’est exposée au navigateur ni versionnée.

@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { TavoData } from "@/lib/catalog";
+import { GoogleWalletButton } from "@/app/wallet/google-wallet-button";
 
 type Screen =
   | "wallet"
@@ -145,12 +146,13 @@ function Wallet() {
         <p>
           Les plats et expériences qui valent le détour, sélectionnés à Rabat.
         </p>
-        <a className="button button-cream" href="/">
+        <GoogleWalletButton />
+        <a className="wallet-open-link" href="/">
           Ouvrir TAVO <span>→</span>
         </a>
         <small>Accès instantané · aucune donnée personnelle requise</small>
       </section>
-      <div className="wallet-card" aria-label="Carte TAVO simulée">
+      <div className="wallet-card" aria-label="Aperçu du pass TAVO">
         <div className="wallet-card-top">
           <span className="tavo-monogram">T</span>
           <span>
