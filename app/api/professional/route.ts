@@ -18,7 +18,7 @@ export async function GET() {
   if (!user) return unauthorized();
   const restaurantIds = await scopedRestaurantIds(user);
   const safeIds = restaurantIds.length ? restaurantIds : [-1];
-  const [restaurants, orders, offers, proposals, support, statements, categories, collections, labels, dishes, crown, users, cities, sectors] = await Promise.all([
+  const [restaurants, orders, offers, proposals, support, statements, categories, collections, labels, dishes, crownCategories, crown, users, cities, sectors] = await Promise.all([
     rows(`SELECT r.id,r.name,r.slug,r.city_id,r.sector_id,r.address,r.latitude::double precision,r.longitude::double precision,r.status,r.ordering_radius_m::double precision,r.commission_bps,c.name AS city,s.name AS sector
       FROM restaurants r JOIN cities c ON c.id=r.city_id JOIN sectors s ON s.id=r.sector_id WHERE r.id=ANY($1::int[]) ORDER BY r.name`, [safeIds]),
     rows(`SELECT o.id,o.reference,o.restaurant_id,r.name AS restaurant_name,o.status,o.gross_cents,o.commission_cents,o.billable,o.submitted_at,
@@ -37,7 +37,9 @@ export async function GET() {
     user.role === "ADMIN" ? rows("SELECT id,name,slug,description,sort_order,status FROM collections ORDER BY sort_order,id") : Promise.resolve([]),
     user.role === "ADMIN" ? rows("SELECT id,name,slug,status FROM labels ORDER BY name") : Promise.resolve([]),
     user.role !== "PARTNER" ? rows("SELECT d.id,d.name,d.slug,d.description,d.ingredients,d.status,d.category_id,c.name AS category_name FROM dishes d LEFT JOIN categories c ON c.id=d.category_id ORDER BY d.name") : Promise.resolve([]),
-    user.role === "ADMIN" ? rows("SELECT id,name,slug,description,featured,status FROM crown_experiences ORDER BY featured DESC,id") : Promise.resolve([]),
+    user.role === "ADMIN" ? rows("SELECT id,name,slug,description,cover_url,sort_order,status FROM crown_categories ORDER BY sort_order,id") : Promise.resolve([]),
+    user.role === "ADMIN" ? rows(`SELECT e.id,e.name,e.slug,e.description,e.image_url,e.featured,e.status,e.category_id,e.capacity_label,e.included_text,e.badges_text,e.gallery_urls,e.sort_order,c.name AS category_name
+      FROM crown_experiences e LEFT JOIN crown_categories c ON c.id=e.category_id ORDER BY e.featured DESC,e.sort_order,e.id`) : Promise.resolve([]),
     user.role === "ADMIN" ? rows(`SELECT u.id,u.name,u.email,u.role,u.city_id,u.sector_id,u.status,
       COALESCE(string_agg(r.name, ', ' ORDER BY r.name),'') AS restaurant_scope
       FROM users u LEFT JOIN user_restaurants ur ON ur.user_id=u.id LEFT JOIN restaurants r ON r.id=ur.restaurant_id
@@ -47,7 +49,7 @@ export async function GET() {
   ]);
   const liveBilling = await rows<{ restaurant_id:number; gross_cents:number; commission_cents:number }>(`SELECT restaurant_id,COALESCE(sum(gross_cents),0)::integer AS gross_cents,
     COALESCE(sum(commission_cents),0)::integer AS commission_cents FROM orders WHERE restaurant_id=ANY($1::int[]) AND status='VALIDATED' AND billable GROUP BY restaurant_id`, [safeIds]);
-  return NextResponse.json({ user, restaurants, orders, offers, proposals, support, statements, liveBilling, categories, collections, labels, dishes, crown, users, cities, sectors });
+  return NextResponse.json({ user, restaurants, orders, offers, proposals, support, statements, liveBilling, categories, collections, labels, dishes, crownCategories, crown, users, cities, sectors });
 }
 
 const actionSchema = z.object({ action: z.string(), payload: z.record(z.string(), z.unknown()).default({}) });
@@ -212,8 +214,15 @@ async function applyProposal(proposal: { restaurant_id:number; type:string; payl
   if (proposal.type === "DESCRIPTION_UPDATE") await rows("UPDATE restaurant_offers SET description_override=$1 WHERE id=$2 AND restaurant_id=$3", [String(proposal.payload.description),Number(proposal.payload.offerId),proposal.restaurant_id]);
   if (proposal.type === "ITEM_REMOVAL") await rows("UPDATE restaurant_offers SET status='ARCHIVED' WHERE id=$1 AND restaurant_id=$2", [Number(proposal.payload.offerId),proposal.restaurant_id]);
   if (proposal.type === "CROWN") {
-    const slug = String(proposal.payload.name || "experience-crown").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-");
-    await rows("INSERT INTO crown_experiences(name,slug,description,status) VALUES($1,$2,$3,'PUBLISHED')", [String(proposal.payload.name),`${slug}-${Date.now()}`,String(proposal.payload.description || "")]);
+    const change = String(proposal.payload.change || "NEW");
+    const offerId = Number(proposal.payload.offerId || 0);
+    if (change === "PRICE") await rows("UPDATE crown_offers SET price_cents=$1 WHERE id=$2 AND restaurant_id=$3", [Number(proposal.payload.proposedPriceCents),offerId,proposal.restaurant_id]);
+    else if (change === "CONTENT") await rows(`UPDATE crown_experiences SET description=$1 WHERE id=(SELECT experience_id FROM crown_offers WHERE id=$2 AND restaurant_id=$3)`, [String(proposal.payload.description || ""),offerId,proposal.restaurant_id]);
+    else if (change === "WITHDRAWAL") await rows("UPDATE crown_offers SET status='ARCHIVED' WHERE id=$1 AND restaurant_id=$2", [offerId,proposal.restaurant_id]);
+    else {
+      const slug = String(proposal.payload.name || "experience-crown").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9]+/g,"-");
+      await rows("INSERT INTO crown_experiences(name,slug,description,status) VALUES($1,$2,$3,'PUBLISHED')", [String(proposal.payload.name),`${slug}-${Date.now()}`,String(proposal.payload.description || "")]);
+    }
   }
 }
 
@@ -230,8 +239,12 @@ async function saveEntity(entity: string, data: Record<string,unknown>) {
     if (id) await rows("UPDATE dishes SET name=$1,slug=$2,description=$3,ingredients=$4,image_url=$5,kcal=$6,kcal_status=$7,category_id=$8,status=$9 WHERE id=$10", [data.name,data.slug,data.description||"",data.ingredients||"",data.imageUrl||null,data.kcal||null,data.kcalStatus||null,data.categoryId||null,data.status||"DRAFT",id]);
     else await rows("INSERT INTO dishes(name,slug,description,ingredients,image_url,kcal,kcal_status,category_id,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)", [data.name,data.slug,data.description||"",data.ingredients||"",data.imageUrl||null,data.kcal||null,data.kcalStatus||null,data.categoryId||null,data.status||"DRAFT"]);
   } else if (entity === "crown") {
-    if (id) await rows("UPDATE crown_experiences SET name=$1,slug=$2,description=$3,image_url=$4,featured=$5,status=$6 WHERE id=$7", [data.name,data.slug,data.description||"",data.imageUrl||null,!!data.featured,data.status||"DRAFT",id]);
-    else await rows("INSERT INTO crown_experiences(name,slug,description,image_url,featured,status) VALUES($1,$2,$3,$4,$5,$6)", [data.name,data.slug,data.description||"",data.imageUrl||null,!!data.featured,data.status||"DRAFT"]);
+    const gallery = String(data.galleryUrls || "").split(/[,\n]/).map((value) => value.trim()).filter(Boolean);
+    if (id) await rows("UPDATE crown_experiences SET name=$1,slug=$2,description=$3,image_url=$4,featured=$5,status=$6,category_id=$7,capacity_label=$8,included_text=$9,badges_text=$10,gallery_urls=$11,sort_order=$12 WHERE id=$13", [data.name,data.slug,data.description||"",data.imageUrl||null,!!data.featured,data.status||"DRAFT",data.categoryId||null,data.capacityLabel||"",data.includedText||"",data.badgesText||"",gallery,Number(data.sortOrder||0),id]);
+    else await rows("INSERT INTO crown_experiences(name,slug,description,image_url,featured,status,category_id,capacity_label,included_text,badges_text,gallery_urls,sort_order) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)", [data.name,data.slug,data.description||"",data.imageUrl||null,!!data.featured,data.status||"DRAFT",data.categoryId||null,data.capacityLabel||"",data.includedText||"",data.badgesText||"",gallery,Number(data.sortOrder||0)]);
+  } else if (entity === "crown-category") {
+    if (id) await rows("UPDATE crown_categories SET name=$1,slug=$2,description=$3,cover_url=$4,sort_order=$5,status=$6 WHERE id=$7", [data.name,data.slug,data.description||"",data.imageUrl||null,Number(data.sortOrder||0),data.status||"DRAFT",id]);
+    else await rows("INSERT INTO crown_categories(name,slug,description,cover_url,sort_order,status) VALUES($1,$2,$3,$4,$5,$6)", [data.name,data.slug,data.description||"",data.imageUrl||null,Number(data.sortOrder||0),data.status||"DRAFT"]);
   } else if (entity === "user") {
     if (id) await rows("UPDATE users SET name=$1,email=$2,role=$3,city_id=$4,sector_id=$5,status=$6 WHERE id=$7", [data.name,data.email,data.role,data.cityId||null,data.sectorId||null,data.status||"ACTIVE",id]);
     else await rows("INSERT INTO users(name,email,password_hash,role,city_id,sector_id,status) VALUES($1,$2,$3,$4,$5,$6,'ACTIVE')", [data.name,data.email,await bcrypt.hash(String(data.password),12),data.role,data.cityId||null,data.sectorId||null]);
@@ -248,7 +261,7 @@ async function saveEntity(entity: string, data: Record<string,unknown>) {
 }
 
 async function removeEntity(entity: string, id: number) {
-  const table = ({ category:"categories",collection:"collections",label:"labels",dish:"dishes",crown:"crown_experiences",user:"users",restaurant:"restaurants",city:"cities",sector:"sectors" } as Record<string,string>)[entity];
+  const table = ({ category:"categories",collection:"collections",label:"labels",dish:"dishes",crown:"crown_experiences","crown-category":"crown_categories",user:"users",restaurant:"restaurants",city:"cities",sector:"sectors" } as Record<string,string>)[entity];
   if (!table) throw new Error("Entité non prise en charge.");
   try { await rows(`DELETE FROM ${table} WHERE id=$1`,[id]); }
   catch { await rows(`UPDATE ${table} SET status='ARCHIVED' WHERE id=$1`,[id]); }

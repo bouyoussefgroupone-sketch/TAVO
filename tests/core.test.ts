@@ -11,6 +11,7 @@ import { createOpaqueToken, hashOpaqueToken } from "../lib/tokens";
 test("TAVO V1 core business and privacy invariants", async (suite) => {
   const db = new PGlite();
   await db.exec(await fs.readFile("migrations/0001_initial.sql", "utf8"));
+  await db.exec(await fs.readFile("migrations/0002_crown_catalog.sql", "utf8"));
 
   const city = (await db.query<{id:number}>("INSERT INTO cities(name,slug,status) VALUES('Rabat','rabat','PUBLISHED') RETURNING id")).rows[0].id;
   const agdal = (await db.query<{id:number}>("INSERT INTO sectors(city_id,name,slug,status) VALUES($1,'Agdal','agdal','PUBLISHED') RETURNING id",[city])).rows[0].id;
@@ -101,6 +102,17 @@ test("TAVO V1 core business and privacy invariants", async (suite) => {
     assert.equal((await db.query<{price_cents:number}>("SELECT price_cents FROM restaurant_offers WHERE id=$1",[offer.id])).rows[0].price_cents,offer.price_cents);
     await db.query("UPDATE restaurant_offers SET price_cents=9900 WHERE id=$1",[offer.id]);
     assert.equal((await db.query<{price_cents:number}>("SELECT price_cents FROM restaurant_offers WHERE id=$1",[offer.id])).rows[0].price_cents,9900);
+  });
+
+  await suite.test("Crown categories are independent and experiences support multiple partners", async () => {
+    const crownCategory=(await db.query<{id:number}>("INSERT INTO crown_categories(name,slug,description,status) VALUES('Business','business','Tables professionnelles','PUBLISHED') RETURNING id")).rows[0].id;
+    const experience=(await db.query<{id:number}>("INSERT INTO crown_experiences(name,slug,description,category_id,capacity_label,included_text,status) VALUES('Table privée','table-privee','Un moment sur mesure',$1,'4 personnes','Menu|Service dédié','PUBLISHED') RETURNING id",[crownCategory])).rows[0].id;
+    await db.query("INSERT INTO crown_offers(experience_id,restaurant_id,price_cents,status) VALUES($1,$2,120000,'PUBLISHED'),($1,$3,135000,'PUBLISHED')",[experience,restaurantA,restaurantB]);
+    assert.equal((await db.query("SELECT * FROM crown_offers WHERE experience_id=$1",[experience])).rows.length,2);
+    assert.equal((await db.query("SELECT * FROM categories WHERE slug='business'")).rows.length,0);
+    await assert.rejects(db.query("DELETE FROM crown_categories WHERE id=$1",[crownCategory]));
+    await db.query("UPDATE crown_categories SET status='ARCHIVED' WHERE id=$1",[crownCategory]);
+    assert.equal((await db.query<{status:string}>("SELECT status FROM crown_categories WHERE id=$1",[crownCategory])).rows[0].status,"ARCHIVED");
   });
 
   await suite.test("privacy model contains no customer identity or location history", async () => {

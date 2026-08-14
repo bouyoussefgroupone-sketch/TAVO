@@ -3,7 +3,7 @@ import { one, rows } from "./db";
 export type CatalogDish = {
   id: number; name: string; slug: string; description: string; ingredients: string;
   image_url: string | null; kcal: number | null; kcal_status: "VERIFIED" | "ESTIMATED" | null;
-  category_name: string | null; from_price_cents: number; labels: string[];
+  category_name: string | null; category_slug: string | null; from_price_cents: number; labels: string[];
 };
 
 export type RestaurantOffer = {
@@ -19,13 +19,13 @@ export type RestaurantView = {
 
 async function publicDishes(where = "", params: unknown[] = []): Promise<CatalogDish[]> {
   const data = await rows<Omit<CatalogDish, "labels"> & { labels: string[] | null }>(`SELECT d.id,d.name,d.slug,d.description,d.ingredients,d.image_url,d.kcal,d.kcal_status,
-    c.name AS category_name, min(o.price_cents)::integer AS from_price_cents,
+    c.name AS category_name,c.slug AS category_slug,min(o.price_cents)::integer AS from_price_cents,
     COALESCE(array_agg(DISTINCT l.name) FILTER (WHERE l.name IS NOT NULL AND dl.approved), ARRAY[]::text[]) AS labels
     FROM dishes d LEFT JOIN categories c ON c.id=d.category_id
     JOIN restaurant_offers o ON o.dish_id=d.id AND o.status='PUBLISHED' AND o.available
     LEFT JOIN dish_labels dl ON dl.dish_id=d.id LEFT JOIN labels l ON l.id=dl.label_id AND l.status='PUBLISHED'
     WHERE d.status='PUBLISHED' ${where}
-    GROUP BY d.id,c.name ORDER BY d.id`, params);
+    GROUP BY d.id,c.name,c.slug ORDER BY d.id`, params);
   return data.map((dish) => ({ ...dish, labels: dish.labels ?? [] }));
 }
 
@@ -39,9 +39,9 @@ export async function getHomeData() {
   return { categories, collections, dishes, crown };
 }
 
-export async function getSearchData() {
+export async function getSearchData(category = "", query = "") {
   const home = await getHomeData();
-  return { ...home, dishes: await publicDishes() };
+  return { ...home, dishes: await publicDishes(), searchCategory: category, searchQuery: query };
 }
 
 export async function getDishData(slug: string) {
@@ -75,15 +75,21 @@ export async function getCollectionData(slug: string) {
   return { ...collection, dishes: dishes.filter(Boolean) };
 }
 
-export async function getCrownData(slug?: string) {
-  const experiences = await rows<{ id:number; name:string; slug:string; description:string; image_url:string|null; featured:boolean }>(`SELECT id,name,slug,description,image_url,featured FROM crown_experiences
-    WHERE status='PUBLISHED' ${slug ? "AND slug=$1" : ""} ORDER BY featured DESC,id`, slug ? [slug] : []);
-  if (!slug) return { experiences };
+export async function getCrownData(slug?: string, categorySlug = "") {
+  const categories = await rows<{ id:number; name:string; slug:string; description:string; cover_url:string|null }>("SELECT id,name,slug,description,cover_url FROM crown_categories WHERE status='PUBLISHED' ORDER BY sort_order,id");
+  const conditions = ["e.status='PUBLISHED'"];
+  const params: unknown[] = [];
+  if (slug) { params.push(slug); conditions.push(`e.slug=$${params.length}`); }
+  if (categorySlug) { params.push(categorySlug); conditions.push(`c.slug=$${params.length}`); }
+  const experiences = await rows<{ id:number; name:string; slug:string; description:string; image_url:string|null; featured:boolean; category_name:string|null; category_slug:string|null; capacity_label:string; included_text:string; badges_text:string; gallery_urls:string[]; sort_order:number }>(`SELECT e.id,e.name,e.slug,e.description,e.image_url,e.featured,e.capacity_label,e.included_text,e.badges_text,e.gallery_urls,e.sort_order,c.name AS category_name,c.slug AS category_slug
+    FROM crown_experiences e LEFT JOIN crown_categories c ON c.id=e.category_id
+    WHERE ${conditions.join(" AND ")} ORDER BY e.featured DESC,e.sort_order,e.id`, params);
+  if (!slug) return { categories, experiences, selectedCategory: categorySlug };
   const experience = experiences[0];
   if (!experience) return null;
   const offers = await rows<{ restaurant_name:string; restaurant_slug:string; price_cents:number; availability_note:string }>(`SELECT r.name AS restaurant_name,r.slug AS restaurant_slug,o.price_cents,o.availability_note
     FROM crown_offers o JOIN restaurants r ON r.id=o.restaurant_id WHERE o.experience_id=$1 AND o.status='PUBLISHED' AND r.status='PUBLISHED' ORDER BY o.price_cents`, [experience.id]);
-  return { experience, offers };
+  return { categories, experience, offers };
 }
 
 export type TavoData = Awaited<ReturnType<typeof getHomeData>> & {
@@ -91,4 +97,6 @@ export type TavoData = Awaited<ReturnType<typeof getHomeData>> & {
   restaurant?: RestaurantView | null;
   collection?: Awaited<ReturnType<typeof getCollectionData>>;
   crownDetail?: Awaited<ReturnType<typeof getCrownData>>;
+  searchCategory?: string;
+  searchQuery?: string;
 };

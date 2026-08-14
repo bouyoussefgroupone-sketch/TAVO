@@ -148,7 +148,7 @@ function Wallet() {
         <a className="button button-cream" href="/">
           Ouvrir TAVO <span>→</span>
         </a>
-        <small>Prototype local · aucune donnée personnelle requise</small>
+        <small>Accès instantané · aucune donnée personnelle requise</small>
       </section>
       <div className="wallet-card" aria-label="Carte TAVO simulée">
         <div className="wallet-card-top">
@@ -217,7 +217,7 @@ function Home({ data }: { data?: TavoData }) {
         </div>
         <div className="category-list">
           {homeCategories.map((item, i) => (
-            <a key={item.id} href={`/search?category=${item.slug}`} className={i === 1 ? "active" : ""}>
+            <a key={item.id} href={`/search?category=${item.slug}`}>
               <span>0{i + 1}</span>
               {item.name}
             </a>
@@ -294,11 +294,13 @@ function Home({ data }: { data?: TavoData }) {
 }
 
 function Search({ data }: { data?: TavoData }) {
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(data?.searchQuery ?? "");
+  const [category, setCategory] = useState(data?.searchCategory ?? "");
   const dishes = data?.dishes ?? [];
-  const filtered = dishes.filter((dish) =>
-    dish.name.toLowerCase().includes(query.toLowerCase()),
-  );
+  const filtered = dishes.filter((dish) => {
+    const matchesQuery = `${dish.name} ${dish.description}`.toLowerCase().includes(query.toLowerCase());
+    return matchesQuery && (!category || dish.category_slug === category);
+  });
   return (
     <main className="client-page pale-page">
       <ClientNav />
@@ -317,12 +319,10 @@ function Search({ data }: { data?: TavoData }) {
         </div>
       </section>
       <section className="filters wrap" aria-label="Catégories">
-        {[
-          "Tout",
-          ...(data?.categories.map((category) => category.name) ?? []),
-        ].map((x, i) => (
-          <button className={i === 0 ? "active" : ""} key={x}>
-            {x}
+        <button className={!category ? "active" : ""} onClick={() => setCategory("")} aria-pressed={!category}>Tout</button>
+        {data?.categories.map((item) => (
+          <button className={category === item.slug ? "active" : ""} onClick={() => setCategory(item.slug)} aria-pressed={category === item.slug} key={item.id}>
+            {item.name}
           </button>
         ))}
       </section>
@@ -646,7 +646,7 @@ function Restaurant({ data }: { data?: TavoData }) {
         <div className="section-heading">
           <div>
             <p className="eyebrow">La sélection disponible sur TAVO</p>
-            <h2>Menu TAVO</h2>
+            <h2>Menu RAAS</h2>
           </div>
           <span>{restaurantMenu.length} plats</span>
         </div>
@@ -795,8 +795,11 @@ function Restaurant({ data }: { data?: TavoData }) {
 function Crown({ detail = false, data }: { detail?: boolean; data?: TavoData }) {
   const crownPayload = data?.crownDetail;
   const detailPayload = crownPayload && "experience" in crownPayload ? crownPayload : null;
-  const crownOffer = detailPayload?.offers?.[0];
-  const crownExperiences = (crownPayload && "experiences" in crownPayload ? crownPayload.experiences : data?.crown) ?? [];
+  const crownOffers = detailPayload?.offers ?? [];
+  const crownExperiences = crownPayload && "experiences" in crownPayload ? (crownPayload.experiences ?? []) : [];
+  const crownCategories = crownPayload?.categories ?? [];
+  const selectedCategory = crownPayload && "selectedCategory" in crownPayload ? crownPayload.selectedCategory : "";
+  const featuredExperience = crownExperiences[0];
   if (detail)
     return (
       <main className="crown-page">
@@ -808,39 +811,45 @@ function Crown({ detail = false, data }: { detail?: boolean; data?: TavoData }) 
             ← Crown
           </a>
           <div>
-            <p className="eyebrow">Expérience privée · Édition limitée</p>
+            <p className="eyebrow">{detailPayload?.experience?.category_name ?? "Expérience Crown"}</p>
             <h1>{detailPayload?.experience?.name ?? "La table après minuit"}.</h1>
             <p>{detailPayload?.experience?.description}</p>
+            <span className="crown-badges">{detailPayload?.experience?.badges_text?.split("|").filter(Boolean).map((badge) => <i key={badge}>{badge}</i>)}</span>
           </div>
         </section>
         <section className="crown-story wrap">
           <div>
-            <p className="eyebrow">Le scénario</p>
-            <h2>Une soirée qui se déroule lentement.</h2>
+            <p className="eyebrow">Ce qui vous attend</p>
+            <h2>Un moment composé dans les moindres détails.</h2>
           </div>
           <div>
-            <p>
-              Accueil au patio, première bouchée au feu de bois, quatre
-              assiettes en salle puis un dernier service sous les lanternes. Une
-              expérience pensée par le chef Amine Berrada.
-            </p>
+            <p>{detailPayload?.experience?.description}</p>
+            <ul className="crown-inclusions">
+              {detailPayload?.experience?.included_text?.split("|").filter(Boolean).map((item) => <li key={item}>{item}</li>)}
+            </ul>
             <div className="crown-facts">
               <span>
                 <small>POUR</small>
-                <b>2 personnes</b>
+                <b>{detailPayload?.experience?.capacity_label || "Selon l’offre"}</b>
               </span>
               <span>
-                <small>DURÉE</small>
-                <b>≈ 2 h 30</b>
+                <small>PARTENAIRES</small>
+                <b>{crownOffers.length} adresse{crownOffers.length === 1 ? "" : "s"}</b>
               </span>
               <span>
                 <small>À PARTIR DE</small>
-                <b>{crownOffer ? `${(crownOffer.price_cents / 100).toFixed(0)} MAD` : "Sur demande"}</b>
+                <b>{crownOffers[0] ? `${(crownOffers[0].price_cents / 100).toFixed(0)} MAD` : "Sur demande"}</b>
               </span>
             </div>
-            <a className="button button-gold" href={crownOffer ? `/restaurant/${crownOffer.restaurant_slug}` : "/crown"}>
-              Voir les adresses →
-            </a>
+          </div>
+        </section>
+        <section className="crown-partners wrap">
+          <p className="eyebrow">Choisir une adresse</p>
+          <h2>Les partenaires qui proposent ce moment.</h2>
+          <div>
+            {crownOffers.map((offer, index) => <a href={`/restaurant/${offer.restaurant_slug}`} key={offer.restaurant_slug}>
+              <span>0{index + 1}</span><strong>{offer.restaurant_name}</strong><p>{offer.availability_note}</p><b>{(offer.price_cents / 100).toFixed(0)} MAD</b><i>→</i>
+            </a>)}
           </div>
         </section>
       </main>
@@ -849,7 +858,7 @@ function Crown({ detail = false, data }: { detail?: boolean; data?: TavoData }) 
     <main className="crown-page">
       <ClientNav dark />
       <section className="crown-home-hero">
-        <img src="/images/crown-dinner.webp" alt="Univers TAVO Crown" />
+        <img src={featuredExperience?.image_url ?? "/images/crown-dinner.webp"} alt="Univers TAVO Crown" />
         <span className="shade" />
         <div>
           <p className="eyebrow">TAVO présente</p>
@@ -860,32 +869,43 @@ function Crown({ detail = false, data }: { detail?: boolean; data?: TavoData }) 
             vivez autre chose.
           </h1>
           <p>
-            Des expériences rares, imaginées avec les tables les plus
-            singulières de Rabat.
+            Quel moment voulez-vous vivre ? Des expériences choisies avant l’adresse, imaginées avec les tables les plus singulières de Rabat.
           </p>
-          <a className="button button-gold" href="/crown/la-table-apres-minuit">
+          <a className="button button-gold" href={featuredExperience ? `/crown/${featuredExperience.slug}` : "/crown"}>
             Découvrir l’expérience →
           </a>
         </div>
         <span className="scroll-note">DÉFILER · 01 / 04</span>
       </section>
+      <section className="crown-category-strip wrap">
+        <div className="crown-section-heading">
+          <div><p className="eyebrow">Choisissez l’intention</p><h2>Quel moment voulez-vous vivre&nbsp;?</h2></div>
+          {selectedCategory && <a href="/crown">Tout voir →</a>}
+        </div>
+        <nav className="crown-category-list" aria-label="Catégories Crown">
+          {crownCategories.map((category, index) => <a href={`/crown?category=${category.slug}`} className={selectedCategory === category.slug ? "active" : ""} aria-current={selectedCategory === category.slug ? "page" : undefined} key={category.id}>
+            <span>0{index + 1}</span><b>{category.name}</b><small>{category.description}</small>
+          </a>)}
+        </nav>
+      </section>
       <section className="crown-selection wrap">
-        <p className="eyebrow">La sélection Crown</p>
+        <p className="eyebrow">{selectedCategory ? crownCategories.find((category) => category.slug === selectedCategory)?.name : "La sélection Crown"}</p>
         <h2>
-          Quatre façons de
+          Des expériences pour
           <br />
           sortir de l’ordinaire.
         </h2>
         <div className="crown-cards">
           {crownExperiences.map((experience, i) => (
             <a href={`/crown/${experience.slug}`} key={experience.id}>
-              <span>0{i + 1}</span>
-              <h3>{experience.name}</h3>
-              <p>{experience.description}</p>
-              <i>↗</i>
+              <img src={experience.image_url ?? "/images/crown-dinner.webp"} alt="" />
+              <span className="crown-card-shade" />
+              <div><small>{experience.category_name ?? "Crown"} · {experience.capacity_label || "Sur mesure"}</small><h3>{experience.name}</h3><p>{experience.description}</p></div>
+              <b>0{i + 1}</b><i>↗</i>
             </a>
           ))}
         </div>
+        {!crownExperiences.length && <p className="crown-empty">Aucune expérience publiée dans cette catégorie pour le moment.</p>}
       </section>
     </main>
   );
@@ -897,7 +917,7 @@ const professionalData = {
     name: "Atelier Noya",
     nav: [
       "Commandes",
-      "Menu TAVO",
+      "Menu RAAS",
       "Propositions",
       "Facturation",
       "Informations",
@@ -1019,7 +1039,7 @@ type ProfessionalSnapshot = {
   restaurants: ProfessionalRow[]; orders: ProfessionalRow[]; offers: ProfessionalRow[];
   proposals: ProfessionalRow[]; support: ProfessionalRow[]; statements: ProfessionalRow[];
   liveBilling: ProfessionalRow[]; categories: ProfessionalRow[]; collections: ProfessionalRow[];
-  labels: ProfessionalRow[]; dishes: ProfessionalRow[]; crown: ProfessionalRow[]; users: ProfessionalRow[];
+  labels: ProfessionalRow[]; dishes: ProfessionalRow[]; crownCategories: ProfessionalRow[]; crown: ProfessionalRow[]; users: ProfessionalRow[];
   cities: ProfessionalRow[]; sectors: ProfessionalRow[];
 };
 
@@ -1029,9 +1049,9 @@ function ProfessionalLive({ role, active, data, runAction }: { role:"partner"|"m
   if (!data) return <section className="pro-section"><div className="empty-editorial"><span>Chargement…</span></div></section>;
   if (active.toLowerCase().includes("commande") || active === "Vue d’ensemble") return <LiveOrders data={data} runAction={runAction} />;
   if (active.includes("Proposition")) return <LiveProposals role={role} data={data} runAction={runAction} />;
-  if (active === "Menu TAVO") return <LiveMenu data={data} runAction={runAction} />;
+  if (active === "Menu RAAS") return <LiveMenu data={data} runAction={runAction} />;
   if (active === "Catalogue") return <><AdminEntityManager data={data} runAction={runAction} initialEntity="dish"/><CatalogueRelations data={data} runAction={runAction}/><MediaUploader/></>;
-  if (active === "Crown") return <><AdminEntityManager data={data} runAction={runAction} initialEntity="crown"/><CrownRelations data={data} runAction={runAction}/></>;
+  if (active === "Crown") return <><CrownAdmin data={data} runAction={runAction}/><CrownRelations data={data} runAction={runAction}/></>;
   if (active === "Partenaires") return <LivePartners role={role} data={data} runAction={runAction} />;
   if (active === "Facturation") return <LiveBilling role={role} data={data} runAction={runAction} />;
   if (active === "Support") return <LiveSupport role={role} data={data} runAction={runAction} />;
@@ -1047,11 +1067,11 @@ function LiveOrders({ data, runAction }: { data:ProfessionalSnapshot; runAction:
 
 function LiveMenu({ data, runAction }: { data:ProfessionalSnapshot; runAction:(a:string,p:Record<string,unknown>)=>Promise<void> }) {
   const restaurantId = Number(data.restaurants[0]?.id || 0);
-  return <section className="pro-section"><div className="pro-section-head"><h2>Menu publié</h2><span>Les changements publics passent par validation.</span></div><div className="catalogue-list">{data.offers.map((offer)=><div key={String(offer.id)}><span><small>{String(offer.restaurant_name)}</small><b>{String(offer.dish_name)}</b><p>{offer.is_featured?"Mis en avant dans TAVO":"Menu restaurant"}</p></span><strong>{money(offer.price_cents)}</strong><i className="published">{String(offer.status)}</i></div>)}</div><ProposalCreate restaurantId={restaurantId} runAction={runAction}/></section>;
+  return <section className="pro-section"><div className="pro-section-head"><h2>Menu RAAS publié</h2><span>Les changements publics passent par validation.</span></div><div className="catalogue-list">{data.offers.map((offer)=><div key={String(offer.id)}><span><small>{String(offer.restaurant_name)}</small><b>{String(offer.dish_name)}</b><p>{offer.is_featured?"Mis en avant dans TAVO":"Menu RAAS"}</p></span><strong>{money(offer.price_cents)}</strong><i className="published">{String(offer.status)}</i></div>)}</div><ProposalCreate restaurantId={restaurantId} runAction={runAction}/></section>;
 }
 
 function ProposalCreate({ restaurantId, runAction }: { restaurantId:number; runAction:(a:string,p:Record<string,unknown>)=>Promise<void> }) {
-  return <form className="pro-form" onSubmit={(event)=>{event.preventDefault();const form=new FormData(event.currentTarget);void runAction("proposal-create",{restaurantId,type:form.get("type"),data:{offerId:Number(form.get("offerId")),proposedPriceCents:Number(form.get("price"))*100,name:form.get("name"),description:form.get("description")}});event.currentTarget.reset();}}><h3>Nouvelle proposition</h3><select name="type"><option value="PRICE_UPDATE">Mise à jour de prix</option><option value="NEW_ITEM">Nouveau plat</option><option value="CROWN">Expérience Crown</option><option value="ITEM_REMOVAL">Retrait d’un plat</option></select><input name="offerId" type="number" placeholder="ID de l’offre"/><input name="price" type="number" placeholder="Nouveau prix (MAD)"/><input name="name" placeholder="Nom de la proposition"/><input name="description" placeholder="Description"/><button className="pro-primary">SOUMETTRE POUR VALIDATION</button></form>;
+  return <form className="pro-form" onSubmit={(event)=>{event.preventDefault();const form=new FormData(event.currentTarget);void runAction("proposal-create",{restaurantId,type:form.get("type"),data:{change:form.get("crownChange"),offerId:Number(form.get("offerId")),proposedPriceCents:Number(form.get("price"))*100,name:form.get("name"),description:form.get("description")}});event.currentTarget.reset();}}><h3>Nouvelle proposition</h3><select name="type"><option value="PRICE_UPDATE">Mise à jour de prix</option><option value="NEW_ITEM">Nouveau plat</option><option value="CROWN">Expérience Crown</option><option value="ITEM_REMOVAL">Retrait d’un plat</option></select><select name="crownChange"><option value="NEW">Crown · nouvelle expérience</option><option value="CONTENT">Crown · contenu ou visuel</option><option value="PRICE">Crown · prix</option><option value="WITHDRAWAL">Crown · retrait</option></select><input name="offerId" type="number" placeholder="ID de l’offre"/><input name="price" type="number" placeholder="Nouveau prix (MAD)"/><input name="name" placeholder="Nom de la proposition"/><input name="description" placeholder="Description"/><button className="pro-primary">SOUMETTRE POUR VALIDATION</button></form>;
 }
 
 function LiveProposals({ role, data, runAction }: { role:string; data:ProfessionalSnapshot; runAction:(a:string,p:Record<string,unknown>)=>Promise<void> }) {
@@ -1091,6 +1111,25 @@ function AdminEntityManager({ data, runAction, initialEntity }: { data:Professio
 
 function CatalogueRelations({ data, runAction }: { data:ProfessionalSnapshot; runAction:(a:string,p:Record<string,unknown>)=>Promise<void> }) {
   return <section className="pro-section"><div className="pro-section-head"><h2>Classement éditorial</h2><span>Relations dynamiques</span></div><form className="pro-form entity-form" onSubmit={(e)=>{e.preventDefault();const f=new FormData(e.currentTarget);void runAction("dish-label-set",{dishId:Number(f.get("dishId")),labelId:Number(f.get("labelId")),enabled:true});}}><h3>Associer un label approuvé</h3><select name="dishId">{data.dishes.map((d)=><option key={String(d.id)} value={String(d.id)}>{String(d.name)}</option>)}</select><select name="labelId">{data.labels.map((l)=><option key={String(l.id)} value={String(l.id)}>{String(l.name)}</option>)}</select><button className="pro-primary">ASSOCIER</button></form><form className="pro-form entity-form" onSubmit={(e)=>{e.preventDefault();const f=new FormData(e.currentTarget);void runAction("collection-dish-set",{dishId:Number(f.get("dishId")),collectionId:Number(f.get("collectionId")),sortOrder:Number(f.get("sortOrder")),enabled:true});}}><h3>Ajouter à une collection</h3><select name="dishId">{data.dishes.map((d)=><option key={String(d.id)} value={String(d.id)}>{String(d.name)}</option>)}</select><select name="collectionId">{data.collections.map((c)=><option key={String(c.id)} value={String(c.id)}>{String(c.name)}</option>)}</select><input name="sortOrder" type="number" defaultValue="0"/><button className="pro-primary">AJOUTER</button></form></section>;
+}
+
+function CrownAdmin({ data, runAction }: { data:ProfessionalSnapshot; runAction:(a:string,p:Record<string,unknown>)=>Promise<void> }) {
+  return <>
+    <section className="pro-section">
+      <div className="pro-section-head"><h2>Catégories Crown</h2><span>Indépendantes des catégories de plats</span></div>
+      <form className="pro-form entity-form" onSubmit={(event)=>{event.preventDefault();const form=new FormData(event.currentTarget);void runAction("entity-save",{entity:"crown-category",data:{name:form.get("name"),slug:form.get("slug"),description:form.get("description"),imageUrl:form.get("imageUrl"),sortOrder:Number(form.get("sortOrder")),status:form.get("status")}});event.currentTarget.reset();}}>
+        <input name="name" required placeholder="Nom de la catégorie"/><input name="slug" required placeholder="Slug"/><input name="description" placeholder="Description éditoriale"/><input name="imageUrl" placeholder="Image de couverture"/><input name="sortOrder" type="number" defaultValue="0"/><select name="status"><option>DRAFT</option><option>PUBLISHED</option><option>ARCHIVED</option></select><button className="pro-primary">CRÉER LA CATÉGORIE</button>
+      </form>
+      <div className="entity-list">{data.crownCategories.map((category)=><form key={String(category.id)} onSubmit={(event)=>{event.preventDefault();const form=new FormData(event.currentTarget);void runAction("entity-save",{entity:"crown-category",data:{id:category.id,name:form.get("name"),slug:form.get("slug"),description:form.get("description"),imageUrl:form.get("imageUrl"),sortOrder:Number(form.get("sortOrder")),status:form.get("status")}});}}><input name="name" defaultValue={String(category.name)}/><input name="slug" defaultValue={String(category.slug)}/><input name="description" defaultValue={String(category.description??"")}/><input name="imageUrl" defaultValue={String(category.cover_url??"")} placeholder="Image"/><input name="sortOrder" type="number" defaultValue={Number(category.sort_order||0)}/><select name="status" defaultValue={String(category.status)}><option>DRAFT</option><option>PUBLISHED</option><option>ARCHIVED</option></select><button>ENREGISTRER</button><button type="button" onClick={()=>void runAction("entity-remove",{entity:"crown-category",id:category.id})}>SUPPRIMER / ARCHIVER</button></form>)}</div>
+    </section>
+    <section className="pro-section">
+      <div className="pro-section-head"><h2>Expériences Crown</h2><span>Contenu, capacité et publication</span></div>
+      <form className="pro-form entity-form" onSubmit={(event)=>{event.preventDefault();const form=new FormData(event.currentTarget);void runAction("entity-save",{entity:"crown",data:{name:form.get("name"),slug:form.get("slug"),description:form.get("description"),imageUrl:form.get("imageUrl"),galleryUrls:form.get("galleryUrls"),categoryId:Number(form.get("categoryId"))||null,capacityLabel:form.get("capacityLabel"),includedText:form.get("includedText"),badgesText:form.get("badgesText"),sortOrder:Number(form.get("sortOrder")),featured:form.get("featured")==="on",status:form.get("status")}});event.currentTarget.reset();}}>
+        <input name="name" required placeholder="Titre"/><input name="slug" required placeholder="Slug"/><textarea name="description" required placeholder="Description premium concise"/><select name="categoryId"><option value="">Sans catégorie</option>{data.crownCategories.map((category)=><option key={String(category.id)} value={String(category.id)}>{String(category.name)}</option>)}</select><input name="capacityLabel" placeholder="Capacité · ex. 4 personnes"/><input name="includedText" placeholder="Inclus · séparer avec |"/><input name="badgesText" placeholder="Badges · séparer avec |"/><input name="imageUrl" placeholder="Image principale"/><input name="galleryUrls" placeholder="Galerie · URLs séparées par des virgules"/><input name="sortOrder" type="number" defaultValue="0"/><label><input name="featured" type="checkbox"/> Mettre en avant</label><select name="status"><option>DRAFT</option><option>PUBLISHED</option><option>ARCHIVED</option></select><button className="pro-primary">CRÉER L’EXPÉRIENCE</button>
+      </form>
+      <div className="entity-list">{data.crown.map((experience)=><form key={String(experience.id)} onSubmit={(event)=>{event.preventDefault();const form=new FormData(event.currentTarget);void runAction("entity-save",{entity:"crown",data:{id:experience.id,name:form.get("name"),slug:form.get("slug"),description:form.get("description"),imageUrl:form.get("imageUrl"),galleryUrls:form.get("galleryUrls"),categoryId:Number(form.get("categoryId"))||null,capacityLabel:form.get("capacityLabel"),includedText:form.get("includedText"),badgesText:form.get("badgesText"),sortOrder:Number(form.get("sortOrder")),featured:form.get("featured")==="on",status:form.get("status")}});}}><input name="name" defaultValue={String(experience.name)}/><input name="slug" defaultValue={String(experience.slug)}/><input name="description" defaultValue={String(experience.description??"")}/><select name="categoryId" defaultValue={String(experience.category_id??"")}><option value="">Sans catégorie</option>{data.crownCategories.map((category)=><option key={String(category.id)} value={String(category.id)}>{String(category.name)}</option>)}</select><input name="capacityLabel" defaultValue={String(experience.capacity_label??"")} placeholder="Capacité"/><input name="includedText" defaultValue={String(experience.included_text??"")} placeholder="Inclus"/><input name="badgesText" defaultValue={String(experience.badges_text??"")} placeholder="Badges"/><input name="imageUrl" defaultValue={String(experience.image_url??"")} placeholder="Image"/><input name="galleryUrls" defaultValue={Array.isArray(experience.gallery_urls)?experience.gallery_urls.join(", "):""} placeholder="Galerie"/><input name="sortOrder" type="number" defaultValue={Number(experience.sort_order||0)}/><label><input name="featured" type="checkbox" defaultChecked={Boolean(experience.featured)}/> Mise en avant</label><select name="status" defaultValue={String(experience.status)}><option>DRAFT</option><option>PUBLISHED</option><option>ARCHIVED</option></select><button>ENREGISTRER</button><button type="button" onClick={()=>void runAction("entity-remove",{entity:"crown",id:experience.id})}>SUPPRIMER / ARCHIVER</button></form>)}</div>
+    </section>
+  </>;
 }
 
 function CrownRelations({ data, runAction }: { data:ProfessionalSnapshot; runAction:(a:string,p:Record<string,unknown>)=>Promise<void> }) {
@@ -1271,11 +1310,10 @@ function ClientFooter() {
       </p>
       <div>
         <a href="/wallet">Wallet</a>
-        <a href="/partner">Partenaire</a>
-        <a href="/manager">Manager</a>
-        <a href="/admin">Admin</a>
+        <a href="/search">Explorer</a>
+        <a href="/crown">Crown</a>
       </div>
-      <small>V1 locale · Données et établissements de démonstration</small>
+      <small>Rabat · Sélection éditoriale TAVO</small>
     </footer>
   );
 }

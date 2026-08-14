@@ -48,7 +48,7 @@ const restaurants = [
 const restaurantIds: Record<string, number> = {};
 for (const [name, slug, sector, address, latitude, longitude, image] of restaurants) {
   restaurantIds[slug] = await insertId(`INSERT INTO restaurants(name,slug,city_id,sector_id,address,latitude,longitude,ordering_radius_m,description,image_url,status)
-    VALUES($1,$2,$3,$4,$5,$6,$7,10,$8,$9,'PUBLISHED') RETURNING id`, [name, slug, rabatId, sectorIds[sector], address, latitude, longitude, "Adresse partenaire de démonstration TAVO.", image]);
+    VALUES($1,$2,$3,$4,$5,$6,$7,10,$8,$9,'PUBLISHED') RETURNING id`, [name, slug, rabatId, sectorIds[sector], address, latitude, longitude, "Adresse partenaire sélectionnée par TAVO.", image]);
 }
 
 const categoryData = ["Petit-déjeuner", "Salades", "Entrées", "Plats", "Desserts", "Boissons"];
@@ -111,15 +111,25 @@ for (const slug of ["cesar-signature", "carottes-roties", "couscous-safran", "pa
   await db.query("INSERT INTO collection_dishes(collection_id,dish_id,sort_order) VALUES($1,$2,$3)", [collectionIds["frais-et-vif"], dishIds[slug], Object.keys(dishIds).indexOf(slug)]);
 }
 
+const crownCategoryData = [
+  ["VIP", "vip", "Tables remarquables et attentions exclusives."],
+  ["À deux", "a-deux", "Moments privés pensés pour deux."],
+  ["En famille", "en-famille", "Grandes tables et menus à partager."],
+  ["Entre amis", "entre-amis", "Expériences généreuses pour se retrouver."],
+  ["Célébration", "celebration", "Occasions composées jusque dans les détails."],
+] as const;
+for (const [index, [name, slug, description]] of crownCategoryData.entries()) await db.query("INSERT INTO crown_categories(name,slug,description,sort_order,status) VALUES($1,$2,$3,$4,'PUBLISHED') ON CONFLICT(slug) DO UPDATE SET name=excluded.name,description=excluded.description", [name, slug, description, (index + 1) * 10]);
+const crownCategoryIds = Object.fromEntries((await rows<{id:number;slug:string}>("SELECT id,slug FROM crown_categories")).map((category) => [category.slug,category.id]));
 const crownData = [
-  ["La table après minuit", "la-table-apres-minuit", "Un dîner en six gestes pour deux, entre côte Atlantique et parfums de l’Atlas."],
-  ["Le jardin secret", "le-jardin-secret", "Une table privée au jardin et un menu végétal de saison."],
-  ["Feu, sel & Atlantique", "feu-sel-atlantique", "Une dégustation autour des poissons, du feu et des agrumes."],
-  ["Dimanche en grand", "dimanche-en-grand", "Un déjeuner généreux imaginé pour les longues tablées."],
-];
-for (const [index, [name, slug, description]] of crownData.entries()) {
-  const experienceId = await insertId("INSERT INTO crown_experiences(name,slug,description,image_url,featured,status) VALUES($1,$2,$3,$4,$5,'PUBLISHED') RETURNING id", [name, slug, description, "/images/crown-dinner.webp", index === 0]);
-  await db.query("INSERT INTO crown_offers(experience_id,restaurant_id,price_cents,availability_note,status) VALUES($1,$2,$3,$4,'PUBLISHED')", [experienceId, restaurantIds[restaurants[index % restaurants.length][1]], 68000 + index * 10000, "Sur réservation auprès du restaurant"]);
+  ["La table après minuit", "la-table-apres-minuit", "Un dîner en six gestes pour deux, entre côte Atlantique et parfums de l’Atlas.", "a-deux", "2 personnes", "Menu en plusieurs temps|Accueil privilégié|Table privée", "ÉDITION LIMITÉE|CHEF EXPERIENCE"],
+  ["Le jardin secret", "le-jardin-secret", "Une table privée au jardin et un menu végétal de saison.", "vip", "4 personnes", "Menu de saison|Service au jardin|Dessert à partager", "PRIVÉ|VÉGÉTAL"],
+  ["Feu, sel & Atlantique", "feu-sel-atlantique", "Une dégustation autour des poissons, du feu et des agrumes.", "entre-amis", "4 personnes", "Menu au feu|Accords sans alcool|Service dédié", "ATLANTIQUE|SIGNATURE"],
+  ["Dimanche en grand", "dimanche-en-grand", "Un déjeuner généreux imaginé pour les longues tablées.", "en-famille", "6 personnes", "Menu familial|Dessert inclus|Grande tablée", "FAMILLE|DIMANCHE"],
+] as const;
+for (const [index, [name, slug, description, categorySlug, capacity, included, badges]] of crownData.entries()) {
+  const experienceId = await insertId("INSERT INTO crown_experiences(name,slug,description,image_url,featured,status,category_id,capacity_label,included_text,badges_text,gallery_urls,sort_order) VALUES($1,$2,$3,$4,$5,'PUBLISHED',$6,$7,$8,$9,$10,$11) RETURNING id", [name, slug, description, "/images/crown-dinner.webp", index === 0, crownCategoryIds[categorySlug], capacity, included, badges, ["/images/crown-dinner.webp"], (index + 1) * 10]);
+  await db.query("INSERT INTO crown_offers(experience_id,restaurant_id,price_cents,availability_note,status) VALUES($1,$2,$3,$4,'PUBLISHED')", [experienceId, restaurantIds[restaurants[index % restaurants.length][1]], 68000 + index * 10000, "Disponibilité confirmée auprès du restaurant"]);
+  if (index < 2) await db.query("INSERT INTO crown_offers(experience_id,restaurant_id,price_cents,availability_note,status) VALUES($1,$2,$3,$4,'PUBLISHED')", [experienceId, restaurantIds[restaurants[(index + 2) % restaurants.length][1]], 72000 + index * 10000, "Expérience proposée sur dates sélectionnées"]);
 }
 
 await db.query("INSERT INTO settings(key,value) VALUES('default_commission_bps',$1),('visit_lifetime_minutes',$2),('presence_lifetime_minutes',$3)", [JSON.stringify(1200), JSON.stringify(180), JSON.stringify(10)]);
