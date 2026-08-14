@@ -302,7 +302,7 @@ function Search({ data }: { data?: TavoData }) {
     return matchesQuery && (!category || dish.category_slug === category);
   });
   return (
-    <main className="client-page pale-page">
+    <main className="client-page pale-page explorer-page">
       <ClientNav />
       <section className="search-intro wrap">
         <p className="eyebrow">Catalogue TAVO · Rabat</p>
@@ -318,7 +318,7 @@ function Search({ data }: { data?: TavoData }) {
           <small>{filtered.length} résultats</small>
         </div>
       </section>
-      <section className="filters wrap" aria-label="Catégories">
+      <section className="filters wrap explorer-category-rail" aria-label="Catégories">
         <button className={!category ? "active" : ""} onClick={() => setCategory("")} aria-pressed={!category}>Tout</button>
         {data?.categories.map((item) => (
           <button className={category === item.slug ? "active" : ""} onClick={() => setCategory(item.slug)} aria-pressed={category === item.slug} key={item.id}>
@@ -855,7 +855,7 @@ function Crown({ detail = false, data }: { detail?: boolean; data?: TavoData }) 
       </main>
     );
   return (
-    <main className="crown-page">
+    <main className={`crown-page ${selectedCategory ? "crown-explorer-page" : "crown-landing-page"}`}>
       <ClientNav dark />
       <section className="crown-home-hero">
         <img src={featuredExperience?.image_url ?? "/images/crown-dinner.webp"} alt="Univers TAVO Crown" />
@@ -877,7 +877,7 @@ function Crown({ detail = false, data }: { detail?: boolean; data?: TavoData }) 
         </div>
         <span className="scroll-note">DÉFILER · 01 / 04</span>
       </section>
-      <section className="crown-category-strip wrap">
+      <section className={`crown-category-strip wrap ${selectedCategory ? "crown-explorer-rail" : ""}`}>
         <div className="crown-section-heading">
           <div><p className="eyebrow">Choisissez l’intention</p><h2>Quel moment voulez-vous vivre&nbsp;?</h2></div>
           {selectedCategory && <a href="/crown">Tout voir →</a>}
