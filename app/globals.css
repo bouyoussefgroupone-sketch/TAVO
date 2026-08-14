@@ -40,16 +40,19 @@
 
 /* mobile category navigation correction */
 @media(max-width:520px){
-  .home-page>.home-hero{height:calc(100svh - 246px);min-height:0}
+  html:has(.home-page),body:has(.home-page),html:has(.crown-landing-page),body:has(.crown-landing-page){height:100dvh;min-height:100dvh;overflow:hidden;overscroll-behavior:none}
+  .home-page,.crown-landing-page{position:relative;height:100dvh;min-height:100dvh;max-height:100dvh;overflow:hidden;overscroll-behavior:none;touch-action:pan-x}
+  .home-page>.home-hero{height:calc(100dvh - 246px - env(safe-area-inset-bottom));min-height:0}
   .home-page .home-hero-copy{bottom:28px}
   .home-page .home-hero-copy h1{font-size:46px;margin:10px 0 24px}
   .home-page .hero-search{height:54px}
-  .home-page>.category-strip{height:180px;padding:18px 0 0;display:grid;grid-template-rows:1fr 82px;overflow:hidden}
+  .home-page>.category-strip{position:fixed;z-index:65;left:16px;right:16px;bottom:0;width:auto;height:calc(180px + env(safe-area-inset-bottom));margin:0;padding:18px 0 env(safe-area-inset-bottom);display:grid;grid-template-rows:1fr 82px;overflow:hidden;background:var(--paper);touch-action:pan-x}
   .home-page>.category-strip .section-heading{align-items:end;margin:0 0 14px}
   .home-page>.category-strip .section-heading .eyebrow{margin:0}
   .home-page>.category-strip .section-heading h2{font-size:34px;margin:5px 0 0}
   .home-page>.category-strip .category-list{width:calc(100% + 16px);height:82px;align-self:end}
   .home-page>.category-strip .category-list a{min-width:142px;height:81px;padding:18px 16px}
+  .home-page>.editorial-grid,.home-page>.collection-band,.home-page>.crown-teaser,.home-page>.client-footer{display:none}
 
   .explorer-page{min-height:100svh}
   .explorer-page .explorer-category-rail{position:fixed;z-index:65;left:0;right:0;bottom:0;width:100%;height:calc(68px + env(safe-area-inset-bottom));margin:0;padding:0 0 env(safe-area-inset-bottom);background:rgba(248,245,237,.98);box-shadow:0 -12px 38px rgba(28,26,23,.12);border-top:1px solid var(--line);border-bottom:0;backdrop-filter:blur(14px)}
@@ -57,14 +60,14 @@
   .explorer-page .dish-results{padding-bottom:calc(154px + env(safe-area-inset-bottom))}
   .explorer-page .client-footer{padding-bottom:calc(102px + env(safe-area-inset-bottom))}
 
-  .crown-landing-page .crown-home-hero{height:calc(100svh - 205px);min-height:0}
+  .crown-landing-page .crown-home-hero{height:calc(100dvh - 205px - env(safe-area-inset-bottom));min-height:0}
   .crown-landing-page .crown-home-hero>div{top:auto;bottom:28px;transform:none}
   .crown-landing-page .crown-title{margin:12px 0 22px}
   .crown-landing-page .crown-home-hero h1{font-size:54px;margin-bottom:22px}
   .crown-landing-page .crown-home-hero>div>p:last-of-type{font-size:15px;line-height:1.45}
   .crown-landing-page .crown-home-hero .button{margin-top:17px;padding:14px 16px}
   .crown-landing-page .scroll-note{display:none}
-  .crown-landing-page .crown-category-strip{height:205px;padding:16px 0 0;display:grid;grid-template-rows:1fr 125px;overflow:hidden}
+  .crown-landing-page .crown-category-strip{position:fixed;z-index:65;left:16px;right:16px;bottom:0;width:auto;height:calc(205px + env(safe-area-inset-bottom));margin:0;padding:16px 0 env(safe-area-inset-bottom);display:grid;grid-template-rows:1fr 125px;overflow:hidden;background:#140f0d;touch-action:pan-x}
   .crown-landing-page .crown-section-heading{align-items:end;margin:0 0 12px}
   .crown-landing-page .crown-section-heading .eyebrow{margin:0}
   .crown-landing-page .crown-section-heading h2{font-size:31px;margin:5px 0 0}
@@ -72,6 +75,7 @@
   .crown-landing-page .crown-category-list a{flex-basis:166px;height:124px;min-height:0;padding:16px;grid-template-columns:25px 1fr}
   .crown-landing-page .crown-category-list b{font-size:21px}
   .crown-landing-page .crown-category-list small{font-size:10px;line-height:1.35;margin-top:8px}
+  .crown-landing-page>.crown-selection{display:none}
 
   .crown-explorer-page .client-nav{position:relative;background:#140f0d;border-color:rgba(255,255,255,.16)}
   .crown-explorer-page .crown-home-hero{display:none}
