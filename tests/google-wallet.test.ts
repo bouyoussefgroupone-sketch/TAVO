@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { generateKeyPairSync } from "node:crypto";
 import fs from "node:fs/promises";
 import { decodeJwt, importSPKI, jwtVerify } from "jose";
-import { buildGoogleWalletObject, createGoogleWalletSaveLink, GoogleWalletConfigurationError, readGoogleWalletConfig, TAVO_WALLET_CLASS_SUFFIX, TAVO_WALLET_ISSUER_ID } from "../lib/google-wallet";
+import { buildGoogleWalletObject, createGoogleWalletSaveLink, GoogleWalletConfigurationError, readGoogleWalletConfig, TAVO_WALLET_CLASS_SUFFIX, TAVO_WALLET_ISSUER_ID, TAVO_WALLET_LOGO_URL, TAVO_WALLET_OBJECT_SUFFIX } from "../lib/google-wallet";
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const privatePem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
@@ -14,12 +14,14 @@ test("Google Wallet pass uses the approved stable class, object and TAVO copy", 
   const config = readGoogleWalletConfig(environment);
   const object = buildGoogleWalletObject(config);
   assert.equal(config.classId, `${TAVO_WALLET_ISSUER_ID}.${TAVO_WALLET_CLASS_SUFFIX}`);
-  assert.equal(object.id, `${TAVO_WALLET_ISSUER_ID}.tavo_rabat_edition01`);
+  assert.equal(object.id, `${TAVO_WALLET_ISSUER_ID}.${TAVO_WALLET_OBJECT_SUFFIX}`);
+  assert.match(object.id, /^338800000023172711\.[A-Za-z0-9._-]+$/);
   assert.equal(object.cardTitle.defaultValue.value, "TAVO");
   assert.equal(object.subheader.defaultValue.value, "RABAT · ÉDITION 01");
   assert.equal(object.header.defaultValue.value, "Qu’est-ce qu’on mange aujourd’hui ?");
   assert.equal(object.linksModuleData.uris[0].description, "OUVRIR TAVO");
-  assert.equal(object.logo.sourceUri.uri, "https://tavo-eight.vercel.app/images/tavo-wallet-logo.png");
+  assert.equal(object.logo.sourceUri.uri, TAVO_WALLET_LOGO_URL);
+  assert.match(object.logo.sourceUri.uri, /^https:\/\/[^/]+\.public\.blob\.vercel-storage\.com\/.+\.png$/);
 });
 
 test("Google Wallet save link is an RS256 server-signed Google JWT", async () => {

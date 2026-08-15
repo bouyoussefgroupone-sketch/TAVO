@@ -2,8 +2,9 @@ import { importPKCS8, SignJWT } from "jose";
 
 export const TAVO_WALLET_ISSUER_ID = "338800000023172711";
 export const TAVO_WALLET_CLASS_SUFFIX = "tavo_pass_rabat_01";
-export const TAVO_WALLET_OBJECT_SUFFIX = "tavo_rabat_edition01";
+export const TAVO_WALLET_OBJECT_SUFFIX = "tavo_rabat_edition01_test_20260815_a1";
 export const TAVO_PUBLIC_URL = "https://tavo-eight.vercel.app";
+export const TAVO_WALLET_LOGO_URL = "https://oouscab6kpiooymv.public.blob.vercel-storage.com/tavo-wallet-logo.png";
 
 type Environment = Record<string, string | undefined>;
 
@@ -27,6 +28,10 @@ function qualifiedId(issuerId: string, value: string) {
   return value.startsWith(`${issuerId}.`) ? value : `${issuerId}.${value}`;
 }
 
+function isValidWalletResourceId(value: string) {
+  return /^[A-Za-z0-9._-]+$/.test(value);
+}
+
 export function readGoogleWalletConfig(environment: Environment = process.env): GoogleWalletConfig {
   const serviceAccountEmail = environment.GOOGLE_WALLET_SERVICE_ACCOUNT_EMAIL?.trim();
   const privateKey = environment.GOOGLE_WALLET_PRIVATE_KEY?.replace(/\\n/g, "\n").trim();
@@ -43,7 +48,9 @@ export function readGoogleWalletConfig(environment: Environment = process.env): 
   const objectId = qualifiedId(issuerId, objectValue);
   if (
     classId !== `${TAVO_WALLET_ISSUER_ID}.${TAVO_WALLET_CLASS_SUFFIX}` ||
-    objectId !== `${TAVO_WALLET_ISSUER_ID}.${TAVO_WALLET_OBJECT_SUFFIX}`
+    objectId !== `${TAVO_WALLET_ISSUER_ID}.${TAVO_WALLET_OBJECT_SUFFIX}` ||
+    !isValidWalletResourceId(classId) ||
+    !isValidWalletResourceId(objectId)
   ) {
     throw new GoogleWalletConfigurationError();
   }
@@ -62,7 +69,7 @@ export function buildGoogleWalletObject(config: GoogleWalletConfig) {
     state: "ACTIVE",
     genericType: "GENERIC_TYPE_UNSPECIFIED",
     hexBackgroundColor: "#cf3f27",
-    logo: { sourceUri: { uri: `${config.publicUrl}/images/tavo-wallet-logo.png` }, contentDescription: localized("Monogramme TAVO") },
+    logo: { sourceUri: { uri: TAVO_WALLET_LOGO_URL }, contentDescription: localized("Monogramme TAVO") },
     cardTitle: localized("TAVO"),
     subheader: localized("RABAT · ÉDITION 01"),
     header: localized("Qu’est-ce qu’on mange aujourd’hui ?"),
