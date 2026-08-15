@@ -32,8 +32,8 @@ export function readGoogleWalletConfig(environment: Environment = process.env): 
   const privateKey = environment.GOOGLE_WALLET_PRIVATE_KEY?.replace(/\\n/g, "\n").trim();
   const issuerId = environment.GOOGLE_WALLET_ISSUER_ID?.trim() || TAVO_WALLET_ISSUER_ID;
   const classValue = environment.GOOGLE_WALLET_CLASS_ID?.trim() || TAVO_WALLET_CLASS_SUFFIX;
-  const objectValue = environment.GOOGLE_WALLET_OBJECT_ID?.trim() || TAVO_WALLET_OBJECT_SUFFIX;
-  const publicUrl = (environment.TAVO_PUBLIC_URL?.trim() || TAVO_PUBLIC_URL).replace(/\/$/, "");
+  const objectValue = TAVO_WALLET_OBJECT_SUFFIX;
+  const publicUrl = TAVO_PUBLIC_URL;
 
   if (!serviceAccountEmail || !privateKey?.includes("BEGIN PRIVATE KEY") || !/^\d+$/.test(issuerId) || !publicUrl.startsWith("https://")) {
     throw new GoogleWalletConfigurationError();

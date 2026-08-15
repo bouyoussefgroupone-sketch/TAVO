@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { generateKeyPairSync } from "node:crypto";
+import fs from "node:fs/promises";
 import { decodeJwt, importSPKI, jwtVerify } from "jose";
 import { buildGoogleWalletObject, createGoogleWalletSaveLink, GoogleWalletConfigurationError, readGoogleWalletConfig, TAVO_WALLET_CLASS_SUFFIX, TAVO_WALLET_ISSUER_ID } from "../lib/google-wallet";
 
@@ -36,5 +37,17 @@ test("Google Wallet save link is an RS256 server-signed Google JWT", async () =>
 test("missing credentials fail closed without exposing configuration details", () => {
   assert.throws(() => readGoogleWalletConfig({}), GoogleWalletConfigurationError);
   assert.throws(() => readGoogleWalletConfig({ ...environment, GOOGLE_WALLET_CLASS_ID: "another_class" }), GoogleWalletConfigurationError);
-  assert.throws(() => readGoogleWalletConfig({ ...environment, GOOGLE_WALLET_OBJECT_ID: "another_object" }), GoogleWalletConfigurationError);
+});
+
+test("the TAVO wallet page uses the real integration and official French button asset", async () => {
+  const [pageSource, componentSource, buttonSource] = await Promise.all([
+    fs.readFile("app/tavo-app.tsx", "utf8"),
+    fs.readFile("app/wallet/google-wallet-button.tsx", "utf8"),
+    fs.readFile("public/images/add-to-google-wallet-fr.svg", "utf8"),
+  ]);
+  assert.match(pageSource, /<GoogleWalletButton \/>/);
+  assert.doesNotMatch(pageSource, /Carte TAVO simulée/);
+  assert.match(componentSource, /\/images\/add-to-google-wallet-fr\.svg/);
+  assert.match(componentSource, /alt="Ajouter à Google Wallet"/);
+  assert.match(buttonSource, /width="199" height="55"/);
 });
