@@ -19,6 +19,7 @@ test("Google Wallet pass uses the approved stable class, object and TAVO copy", 
   assert.equal(object.subheader.defaultValue.value, "RABAT · ÉDITION 01");
   assert.equal(object.header.defaultValue.value, "Qu’est-ce qu’on mange aujourd’hui ?");
   assert.equal(object.linksModuleData.uris[0].description, "OUVRIR TAVO");
+  assert.equal(object.logo.sourceUri.uri, "https://tavo-eight.vercel.app/images/tavo-wallet-logo.png");
 });
 
 test("Google Wallet save link is an RS256 server-signed Google JWT", async () => {

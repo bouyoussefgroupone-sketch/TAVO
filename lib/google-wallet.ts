@@ -62,7 +62,7 @@ export function buildGoogleWalletObject(config: GoogleWalletConfig) {
     state: "ACTIVE",
     genericType: "GENERIC_TYPE_UNSPECIFIED",
     hexBackgroundColor: "#cf3f27",
-    logo: { sourceUri: { uri: `${config.publicUrl}/favicon.svg` }, contentDescription: localized("Monogramme TAVO") },
+    logo: { sourceUri: { uri: `${config.publicUrl}/images/tavo-wallet-logo.png` }, contentDescription: localized("Monogramme TAVO") },
     cardTitle: localized("TAVO"),
     subheader: localized("RABAT · ÉDITION 01"),
     header: localized("Qu’est-ce qu’on mange aujourd’hui ?"),
