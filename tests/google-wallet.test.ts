@@ -29,6 +29,7 @@ test("Google Wallet save link is an RS256 server-signed Google JWT", async () =>
   const { payload, protectedHeader } = await jwtVerify(token, key, { issuer: environment.GOOGLE_WALLET_SERVICE_ACCOUNT_EMAIL, audience: "google" });
   assert.equal(protectedHeader.alg, "RS256");
   assert.equal(payload.typ, "savetowallet");
+  assert.deepEqual(payload.origins, []);
   assert.equal((payload.payload as { genericObjects: unknown[] }).genericObjects.length, 1);
   assert.ok(token.length < 1800);
   assert.equal(JSON.stringify(decodeJwt(token)).includes("PRIVATE KEY"), false);

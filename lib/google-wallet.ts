@@ -74,12 +74,11 @@ export function buildGoogleWalletObject(config: GoogleWalletConfig) {
 export async function createGoogleWalletSaveLink(
   config = readGoogleWalletConfig(),
   issuedAt = Math.floor(Date.now() / 1000),
-  origins = [config.publicUrl],
 ) {
   const signingKey = await importPKCS8(config.privateKey, "RS256");
   const jwt = await new SignJWT({
     typ: "savetowallet",
-    origins: [...new Set(origins)],
+    origins: [],
     payload: { genericObjects: [buildGoogleWalletObject(config)] },
   })
     .setProtectedHeader({ alg: "RS256", typ: "JWT" })
