@@ -1,9 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
-import manifest from "../app/manifest";
+import { NextRequest } from "next/server";
+import { GET as getHostedManifest } from "../app/manifest.webmanifest/route";
+import { buildPwaManifest } from "../lib/pwa-manifest";
 import {
   detectPwaEnvironment,
+  getSamsungBrowserVersion,
   isInstallDismissed,
   PWA_DISMISSAL_MS,
   requestNativeInstall,
@@ -15,7 +18,7 @@ const IOS_SAFARI =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1";
 
 test("manifest exposes the installable TAVO standalone identity", async () => {
-  const value = manifest();
+  const value = buildPwaManifest();
   assert.equal(value.name, "TAVO");
   assert.equal(value.short_name, "TAVO");
   assert.equal(value.id, "/");
@@ -104,25 +107,35 @@ test("in-app browsers get contextual guidance without a fake native prompt", () 
 });
 
 test("Samsung Internet never receives the WebAPK install path and is directed to Chrome", async () => {
+  const samsungUserAgent =
+    "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/24.0 Chrome/117.0.0.0 Mobile Safari/537.36";
   const samsung = detectPwaEnvironment({
-    userAgent:
-      "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/24.0 Chrome/117.0.0.0 Mobile Safari/537.36",
+    userAgent: samsungUserAgent,
     platform: "Linux armv8l",
     maxTouchPoints: 5,
     displayModeStandalone: false,
     navigatorStandalone: false,
   });
   assert.equal(samsung.samsungBrowserVersion, "24.0");
+  assert.equal(getSamsungBrowserVersion(samsungUserAgent), "24.0");
   assert.equal(selectInstallSurface(samsung, true, false), "samsung");
+
+  const manifestResponse = getHostedManifest(
+    new NextRequest("https://tavo.example/manifest.webmanifest", { headers: { "user-agent": samsungUserAgent } }),
+  );
+  assert.equal(manifestResponse.status, 404);
+  assert.equal(manifestResponse.headers.get("vary"), "User-Agent");
+  assert.equal(manifestResponse.headers.get("x-tavo-install"), "open-in-chrome");
 
   const component = await fs.readFile("app/pwa-install-experience.tsx", "utf8");
   assert.match(component, /Pour installer TAVO, ouvrez cette page dans Chrome\./);
 });
 
-test("Chrome Android keeps the deferred native PWA install path", () => {
+test("Chrome Android keeps the deferred native PWA install path", async () => {
+  const chromeUserAgent =
+    "Mozilla/5.0 (Linux; Android 16; Pixel 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36";
   const chrome = detectPwaEnvironment({
-    userAgent:
-      "Mozilla/5.0 (Linux; Android 16; Pixel 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36",
+    userAgent: chromeUserAgent,
     platform: "Linux armv8l",
     maxTouchPoints: 5,
     displayModeStandalone: false,
@@ -130,6 +143,12 @@ test("Chrome Android keeps the deferred native PWA install path", () => {
   });
   assert.equal(chrome.samsungBrowserVersion, null);
   assert.equal(selectInstallSurface(chrome, true, false), "android");
+
+  const manifestResponse = getHostedManifest(
+    new NextRequest("https://tavo.example/manifest.webmanifest", { headers: { "user-agent": chromeUserAgent } }),
+  );
+  assert.equal(manifestResponse.status, 200);
+  assert.equal((await manifestResponse.json()).display, "standalone");
 });
 
 test("PWA integration stays scoped to Home and never caches live APIs", async () => {

@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-export default function manifest(): MetadataRoute.Manifest {
+export function buildPwaManifest(): MetadataRoute.Manifest {
   return {
     name: "TAVO",
     short_name: "TAVO",

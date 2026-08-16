@@ -21,6 +21,10 @@ export type BeforeInstallPromptLike = {
   userChoice: Promise<BeforeInstallPromptChoice>;
 };
 
+export function getSamsungBrowserVersion(userAgent: string) {
+  return userAgent.match(/SamsungBrowser\/([\d.]+)/i)?.[1] ?? null;
+}
+
 export function detectPwaEnvironment({
   userAgent,
   platform,
@@ -36,7 +40,7 @@ export function detectPwaEnvironment({
 }): PwaEnvironment {
   const ios = /iPhone|iPad|iPod/i.test(userAgent) || (platform === "MacIntel" && maxTouchPoints > 1);
   const inAppBrowser = /Instagram|FBAN|FBAV|TikTok|BytedanceWebview/i.test(userAgent);
-  const samsungBrowserVersion = userAgent.match(/SamsungBrowser\/([\d.]+)/i)?.[1] ?? null;
+  const samsungBrowserVersion = getSamsungBrowserVersion(userAgent);
   const webkit = /WebKit/i.test(userAgent);
   const alternativeIosBrowser = /CriOS|FxiOS|EdgiOS|OPiOS/i.test(userAgent);
 
