@@ -1,13 +1,14 @@
 export const PWA_DISMISSAL_KEY = "tavo:pwa-install-dismissed-at";
 export const PWA_DISMISSAL_MS = 7 * 24 * 60 * 60 * 1000;
 
-export type InstallSurface = "android" | "ios" | "in-app" | null;
+export type InstallSurface = "android" | "ios" | "in-app" | "samsung" | null;
 
 export type PwaEnvironment = {
   installed: boolean;
   ios: boolean;
   iosSafari: boolean;
   inAppBrowser: boolean;
+  samsungBrowserVersion: string | null;
 };
 
 export type BeforeInstallPromptChoice = {
@@ -35,6 +36,7 @@ export function detectPwaEnvironment({
 }): PwaEnvironment {
   const ios = /iPhone|iPad|iPod/i.test(userAgent) || (platform === "MacIntel" && maxTouchPoints > 1);
   const inAppBrowser = /Instagram|FBAN|FBAV|TikTok|BytedanceWebview/i.test(userAgent);
+  const samsungBrowserVersion = userAgent.match(/SamsungBrowser\/([\d.]+)/i)?.[1] ?? null;
   const webkit = /WebKit/i.test(userAgent);
   const alternativeIosBrowser = /CriOS|FxiOS|EdgiOS|OPiOS/i.test(userAgent);
 
@@ -43,6 +45,7 @@ export function detectPwaEnvironment({
     ios,
     iosSafari: ios && webkit && !alternativeIosBrowser && !inAppBrowser,
     inAppBrowser,
+    samsungBrowserVersion,
   };
 }
 
@@ -58,6 +61,7 @@ export function selectInstallSurface(
   dismissed: boolean,
 ): InstallSurface {
   if (environment.installed || dismissed) return null;
+  if (environment.samsungBrowserVersion) return "samsung";
   if (environment.inAppBrowser) return "in-app";
   if (promptAvailable) return "android";
   if (environment.iosSafari) return "ios";

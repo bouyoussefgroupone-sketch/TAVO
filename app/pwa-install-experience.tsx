@@ -16,6 +16,7 @@ const EMPTY_ENVIRONMENT: PwaEnvironment = {
   ios: false,
   iosSafari: false,
   inAppBrowser: false,
+  samsungBrowserVersion: null,
 };
 
 type BeforeInstallPromptEvent = Event & BeforeInstallPromptLike;
@@ -97,7 +98,12 @@ export function PwaInstallExperience() {
     <aside className={`pwa-install-sheet pwa-install-${surface}`} role="dialog" aria-label="Installer TAVO">
       <span className="pwa-install-monogram" aria-hidden="true">T</span>
       <div className="pwa-install-copy">
-        {surface === "in-app" ? (
+        {surface === "samsung" ? (
+          <>
+            <strong>Pour installer TAVO, ouvrez cette page dans Chrome.</strong>
+            <p>Continuez à parcourir TAVO ici, ou utilisez Chrome pour l’ajouter à votre écran d’accueil.</p>
+          </>
+        ) : surface === "in-app" ? (
           <>
             <strong>Ouvrez TAVO dans votre navigateur</strong>
             <p>Utilisez le menu de cette application, puis « Ouvrir dans le navigateur ».</p>

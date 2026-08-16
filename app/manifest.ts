@@ -5,6 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "TAVO",
     short_name: "TAVO",
     description: "Les plats et expériences qui valent le détour, sélectionnés à Rabat.",
+    id: "/",
     start_url: "/",
     scope: "/",
     display: "standalone",
