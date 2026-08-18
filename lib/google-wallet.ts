@@ -1,8 +1,8 @@
 import { importPKCS8, SignJWT } from "jose";
 
-export const TAVO_WALLET_ISSUER_ID = "338800000023172711";
+export const TAVO_WALLET_ISSUER_ID = "3388000000023172711";
 export const TAVO_WALLET_CLASS_SUFFIX = "tavo_pass_rabat_01";
-export const TAVO_WALLET_OBJECT_SUFFIX = "tavo_rabat_edition01_test_20260815_a1";
+export const TAVO_WALLET_OBJECT_SUFFIX = "tavo_rabat_edition01_test_20260818_b1";
 export const TAVO_PUBLIC_URL = "https://tavo-eight.vercel.app";
 export const TAVO_WALLET_LOGO_URL = "https://oouscab6kpiooymv.public.blob.vercel-storage.com/tavo-wallet-logo.png";
 

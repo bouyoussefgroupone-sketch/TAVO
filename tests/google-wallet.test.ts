@@ -15,7 +15,7 @@ test("Google Wallet pass uses the approved stable class, object and TAVO copy", 
   const object = buildGoogleWalletObject(config);
   assert.equal(config.classId, `${TAVO_WALLET_ISSUER_ID}.${TAVO_WALLET_CLASS_SUFFIX}`);
   assert.equal(object.id, `${TAVO_WALLET_ISSUER_ID}.${TAVO_WALLET_OBJECT_SUFFIX}`);
-  assert.match(object.id, /^338800000023172711\.[A-Za-z0-9._-]+$/);
+  assert.match(object.id, /^3388000000023172711\.[A-Za-z0-9._-]+$/);
   assert.equal(object.cardTitle.defaultValue.value, "TAVO");
   assert.equal(object.subheader.defaultValue.value, "RABAT · ÉDITION 01");
   assert.equal(object.header.defaultValue.value, "Qu’est-ce qu’on mange aujourd’hui ?");
